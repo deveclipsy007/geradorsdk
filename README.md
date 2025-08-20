@@ -1,490 +1,577 @@
-# 🤖 Gerador de Agentes v2.0
+# 🤖 Gerador de Agentes SDK v2.0
 
-Sistema enterprise para criação e gerenciamento de agentes inteligentes usando o framework Agno, com persistência robusta, interface moderna e integração OCM Drizzy.
+![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
+![Agno](https://img.shields.io/badge/Agno-1.7.8-purple.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+Sistema enterprise para criação, gerenciamento e execução de agentes inteligentes usando o framework **Agno**. Inclui interface web moderna, persistência robusta, APIs completas e integrações com WhatsApp, Google Calendar, e-mail e pagamentos.
 
 ## ✨ Características Principais
 
-### 🧠 **Criação Inteligente de Agentes**
-- **Framework Agno**: Utiliza o poderoso framework Agno para agentes multi-modais
-- **Múltiplos Modelos**: Claude 3 (Sonnet/Haiku), GPT-4, GPT-3.5, Llama 3, Mixtral
-- **Ferramentas Avançadas**: Raciocínio, dados financeiros, busca web, Python, arquivos
-- **Configuração Visual**: Interface intuitiva com tooltips e validação em tempo real
+### 🚀 **Framework Agno de Nova Geração**
+- **Performance Extrema**: 10.000x mais rápido que LangGraph (~2 microssegundos)
+- **5 Níveis Agênticos**: De ferramentas simples a workflows complexos
+- **Multimodal Nativo**: Texto, imagem, áudio e vídeo em um só framework
+- **Múltiplos Modelos**: Claude 3, GPT-4, Llama 3, Mixtral via Groq
 
-### 🗄️ **Persistência Robusta**
-- **Banco de Dados**: SQLite, PostgreSQL ou MySQL com SQLAlchemy ORM
-- **Histórico Completo**: Todas as conversas e execuções são salvas
-- **Gestão de Sessões**: Controle automático de expiração e limpeza
-- **Backup Ready**: Estrutura preparada para backups e replicação
+### 🔌 **Integrações Empresariais**
+- **WhatsApp Business**: Evolution API para automação completa
+- **Google Calendar**: Agendamento inteligente e gestão de eventos
+- **E-mail**: Envio automatizado via SMTP e templates
+- **Pagamentos**: Stripe e Asaas para processamento de transações
+- **Webhooks**: Sistema robusto de notificações em tempo real
 
-### 🔄 **Integração OCM Drizzy**
-- **Notificações Inteligentes**: Sistema completo de alertas e monitoramento
-- **Webhooks Assíncronos**: Notificações não-bloqueantes em tempo real
-- **Múltiplas Prioridades**: Low, Normal, High, Critical
-- **Fila de Notificações**: Sistema de retry e processamento em lote
+### 🎨 **Interface Moderna & Responsiva**
+- **Design Glassmorphism**: Visual moderno com efeitos de vidro
+- **Dark Theme**: Otimizado para desenvolvedores
+- **Mobile First**: Funciona perfeitamente em todos os dispositivos
+- **Real-time Updates**: Atualizações instantâneas via WebSocket
 
-### 🎨 **Interface Moderna**
-- **Design Responsivo**: Otimizada para desktop, tablet e mobile
-- **Busca Avançada**: Filtros e busca em tempo real
-- **Visualizações Múltiplas**: Grid e lista com controles intuitivos
-- **Feedback Visual**: Loading states, progress bars e notificações toast
-- **Quick Actions**: Botões flutuantes para ações rápidas
+### 🗄️ **Persistência Enterprise**
+- **Múltiplos Bancos**: SQLite, PostgreSQL, MySQL
+- **SQLAlchemy ORM**: Migrations automáticas e type safety
+- **Histórico Completo**: Todas as conversas e execuções persistidas
+- **Backup Ready**: Estrutura otimizada para backup e replicação
 
-### ⚡ **Performance & Monitoramento**
-- **Operações Assíncronas**: I/O não-bloqueante para máxima performance
-- **Health Checks**: Monitoramento contínuo de todos os serviços
-- **Métricas Detalhadas**: Estatísticas de uso e performance
-- **Logs Estruturados**: Sistema avançado de logging e debugging
-
-## 📁 Estrutura do Projeto
+## 📁 Arquitetura do Projeto
 
 ```
-gerador-de-agentes/
-├── backend/
-│   ├── main.py              # 🚀 Servidor FastAPI principal
-│   ├── config.py            # ⚙️ Sistema de configuração centralizada
-│   ├── database.py          # 🗄️ ORM SQLAlchemy e modelos
-│   ├── services.py          # 🏗️ Lógica de negócio (Agent/Chat/System)
-│   ├── drizzy_integration.py # 🔄 Cliente OCM Drizzy
-│   ├── agent_generator.py   # 🤖 Gerador de código Agno
-│   ├── agent_executor.py    # ⚡ Executor de agentes
-│   └── models.py            # 📋 Modelos Pydantic
-├── frontend/
-│   ├── index.html           # 🎨 Interface principal (moderna)
-│   ├── styles.css           # 💎 Estilos responsivos (glassmorphism)
-│   └── script.js            # ⚡ JavaScript interativo
-├── .env.example             # 🔧 Template de configuração
-├── SETUP.md                 # 📖 Guia completo de instalação
-├── CHANGELOG.md             # 📋 Documentação de mudanças
-├── CHECKLIST.md             # ✅ Lista de funcionalidades
-├── start.bat                # 🖥️ Script de inicialização Windows
-├── start.sh                 # 🐧 Script de inicialização Unix
-├── requirements.txt         # 📦 Dependências Python
-└── README.md                # 📄 Este arquivo
+gerador-de-agentes-sdk/
+├── 🔧 backend/                     # API FastAPI e lógica de negócio
+│   ├── main.py                    # 🚀 Servidor principal e rotas API
+│   ├── config.py                  # ⚙️ Configurações centralizadas
+│   ├── database.py                # 🗄️ Modelos SQLAlchemy e ORM
+│   ├── models.py                  # 📋 Schemas Pydantic para validação
+│   └── services/                  # 🏗️ Serviços especializados
+│       ├── evolution_api_service.py # 📱 Integração WhatsApp
+│       ├── calendar_service.py    # 📅 Google Calendar API
+│       ├── email_service.py       # 📧 Envio de e-mails
+│       └── payment_service.py     # 💳 Stripe & Asaas
+├── 🎨 frontend/                    # Interface web moderna
+│   ├── index.html                 # 🏠 SPA responsiva
+│   ├── styles.css                 # 💎 Glassmorphism & animations
+│   └── script.js                  # ⚡ JavaScript interativo
+├── 📚 docs/                        # Documentação completa
+│   ├── SETUP.md                   # 🚀 Guia de instalação
+│   ├── FRAMEWORK_ANALYSIS.md      # 🔍 Análise técnica Agno
+│   ├── CHANGELOG.md               # 📋 Histórico de mudanças
+│   └── CHECKLIST.md               # ✅ Funcionalidades
+├── .env.example                   # 🔧 Template de configuração
+├── requirements.txt               # 📦 Dependências Python
+├── start.bat / start.sh           # 🎬 Scripts de inicialização
+└── README.md                      # 📖 Este arquivo
 ```
 
-## 🚀 Instalação Rápida
+## 🚀 Instalação e Configuração
 
-### Método 1: Script Automático (Recomendado)
+### 📋 Pré-requisitos
 
-**Windows:**
-```bash
-# Execute o script de inicialização
-start.bat
-```
+| Requisito | Versão | Descrição |
+|-----------|--------|-----------|
+| **Python** | 3.8+ | Runtime principal (recomendado: 3.10+) |
+| **pip/uv** | Latest | Gerenciador de pacotes Python |
+| **API Keys** | - | Pelo menos uma chave de IA necessária |
 
-**Linux/Mac:**
-```bash
-# Torne o script executável e execute
-chmod +x start.sh
-./start.sh
-```
+### ⚡ Instalação Rápida
 
-### Método 2: Instalação Manual
+#### **Método 1: Scripts Automáticos (Recomendado)**
 
-#### 1. Pré-requisitos
-- **Python 3.8+** (Recomendado: 3.10+)
-- **pip** ou **uv** (gerenciador de pacotes)
-- **Uma API Key** (Anthropic, OpenAI ou Groq)
-
-#### 2. Configuração
-
-```bash
-# Clone ou baixe o projeto
-cd gerador-de-agentes
-
-# Crie um ambiente virtual
-python -m venv venv
-
-# Ative o ambiente virtual
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-source venv/bin/activate
-
-# Instale as dependências
-pip install -r requirements.txt
-
-# Configure o ambiente
-cp .env.example .env
-# Edite o arquivo .env com suas configurações
-```
-
-#### 3. Configuração de API Keys
-
-Edite o arquivo `.env` e adicione pelo menos uma chave:
-
-```env
-# Anthropic Claude (Recomendado)
-ANTHROPIC_API_KEY=sk-ant-api03-sua-chave-aqui
-
-# OpenAI GPT
-OPENAI_API_KEY=sk-sua-chave-openai-aqui
-
-# Groq (Llama/Mixtral)
-GROQ_API_KEY=gsk_sua-chave-groq-aqui
-
-# OCM Drizzy (Opcional)
-DRIZZY_ENABLED=true
-DRIZZY_WEBHOOK_URL=https://seu-webhook-drizzy
-DRIZZY_API_KEY=sua-api-key-drizzy
-```
-
-## ⚡ Execução
-
-### Inicialização Automática
 ```bash
 # Windows
 start.bat
 
-# Linux/Mac
-./start.sh
+# Linux/macOS
+chmod +x start.sh && ./start.sh
 ```
 
-### Inicialização Manual
+#### **Método 2: Instalação Manual**
+
 ```bash
+# 1. Clone o repositório
+git clone https://github.com/deveclipsy007/geradorsdk.git
+cd geradorsdk
+
+# 2. Crie ambiente virtual
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou
+venv\Scripts\activate     # Windows
+
+# 3. Instale dependências
+pip install -r requirements.txt
+
+# 4. Configure ambiente
+cp .env.example .env
+# Edite .env com suas API keys
+
+# 5. Execute o sistema
+cd backend && python main.py
+```
+
+### 🔑 Configuração de API Keys
+
+Edite o arquivo `.env` com suas credenciais:
+
+```env
+# === MODELOS DE IA (Configure pelo menos um) ===
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx        # Claude 3 (Recomendado)
+OPENAI_API_KEY=sk-proj-xxxxx                # GPT-4/3.5
+GROQ_API_KEY=gsk_xxxxx                      # Llama 3/Mixtral
+
+# === INTEGRAÇÕES EMPRESARIAIS ===
+# WhatsApp (Evolution API)
+EVOLUTION_API_URL=https://api.evolution.com
+EVOLUTION_API_KEY=your-evolution-key
+
+# Google Calendar
+GOOGLE_CALENDAR_CREDENTIALS=path/to/credentials.json
+
+# E-mail (SMTP)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+
+# Pagamentos
+STRIPE_SECRET_KEY=sk_test_xxxxx
+ASAAS_API_KEY=your-asaas-key
+
+# === CONFIGURAÇÕES DO SISTEMA ===
+HOST=0.0.0.0
+PORT=8000
+DEBUG=false
+DATABASE_URL=sqlite:///./agents.db
+```
+
+## ⚡ Execução e Acesso
+
+### 🚀 Inicialização
+
+Após a configuração, execute:
+
+```bash
+# Método 1: Scripts automáticos
+start.bat      # Windows
+./start.sh     # Linux/Mac
+
+# Método 2: Manual
 cd backend
 python main.py
+
+# Método 3: Uvicorn (produção)
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 🌐 Acesso ao Sistema
-
-Após inicializar, acesse:
+### 🌐 Endpoints Disponíveis
 
 | Serviço | URL | Descrição |
 |---------|-----|------------|
-| **🎨 Interface Principal** | http://localhost:8000/static/index.html | Interface web completa |
+| **🎨 Interface Principal** | http://localhost:8000/static/index.html | SPA moderna e responsiva |
 | **📚 Documentação API** | http://localhost:8000/docs | Swagger/OpenAPI interativo |
-| **❤️ Health Check** | http://localhost:8000/health | Status de saúde do sistema |
-| **📊 Estatísticas** | http://localhost:8000/api/system/stats | Métricas do sistema |
+| **❤️ Health Check** | http://localhost:8000/health | Monitor de saúde do sistema |
+| **📊 Estatísticas** | http://localhost:8000/api/system/stats | Métricas em tempo real |
 | **⚙️ Configurações** | http://localhost:8000/api/config | Configurações ativas |
 
-## 📖 Como Usar
+## 📖 Guia de Uso
 
-### 🤖 1. Criar um Agente
+### 🤖 1. Criar Agentes SDK
 
-1. **Acesse a aba "Criar Agente"**
-2. **Preencha as informações:**
-   - **📝 Nome**: Nome descritivo (até 100 caracteres)
-   - **📄 Descrição**: Propósito detalhado (até 500 caracteres)
-   - **🧠 Modelo**: Claude 3, GPT-4, Llama 3, etc. (com validação de API key)
-   - **🛠️ Ferramentas**: Cards interativos para seleção visual
-   - **📋 Instruções**: Orientações específicas (até 1000 caracteres)
-   - **⚙️ Configurações**: Raciocínio, memória, markdown
-3. **Clique em "Gerar Agente"**
-4. **Visualize o código** gerado com syntax highlighting
-5. **Copie ou baixe** o código do agente
+#### **Via Interface Web**
 
-### 📊 2. Gerenciar Agentes
+1. Acesse a interface principal
+2. Navegue para "Criar Agente SDK"
+3. Selecione a especialização:
+   - **Customer Service**: Atendimento ao cliente
+   - **Scheduling**: Agendamento inteligente
+   - **Sales**: Vendas e conversão
+4. Configure integrações (WhatsApp, Calendar, E-mail)
+5. Clique em "Gerar SDK"
 
-- **🔍 Busca Avançada**: Pesquise por nome ou descrição
-- **📋 Visualizações**: Alterne entre grid e lista
-- **📈 Estatísticas**: Veja métricas em tempo real
-- **👁️ Visualizar**: Examine detalhes e código
-- **🗑️ Excluir**: Remova agentes com confirmação
-- **🔄 Atualizar**: Sincronize a lista automaticamente
+#### **Via API**
 
-### 💬 3. Chat com Agentes
+```bash
+curl -X POST "http://localhost:8000/api/agents/sdk/create" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Assistente de Vendas",
+    "specialization": "sales",
+    "description": "Agente para automatizar vendas via WhatsApp",
+    "model": "claude-3-sonnet-20240229",
+    "instructions": "Você é um vendedor especializado...",
+    "whatsapp_config": {
+      "instance_name": "vendas01"
+    }
+  }'
+```
 
-1. **Selecione um agente** na aba "Testar Agente"
-2. **Inicie o chat** - o agente é carregado automaticamente
-3. **Converse naturalmente** - todas as mensagens são salvas
-4. **Histórico persistente** - recupere conversas anteriores
-5. **Sessões inteligentes** - expiração automática para otimização
-
-### 📱 4. Funcionalidades Avançadas
-
-- **⚡ Quick Actions**: Botões flutuantes para ações rápidas
-- **❤️ Health Check**: Monitore a saúde do sistema
-- **📊 Estatísticas**: Acesse métricas detalhadas
-- **🔔 Notificações**: Sistema toast com múltiplos tipos
-- **📱 Responsivo**: Interface adaptada para todos os dispositivos
-
-## 🔧 Especificações Técnicas
-
-### 🧠 Modelos de IA Suportados
-
-| Modelo | Versão | Características |
-|--------|--------|------------------|
-| **Claude 3 Sonnet** | `claude-3-sonnet-20240229` | ⭐ Recomendado - Equilibrio perfeito |
-| **Claude 3 Haiku** | `claude-3-haiku-20240307` | ⚡ Rápido e eficiente |
-| **GPT-4** | `gpt-4` | 💪 Poderoso para tarefas complexas |
-| **GPT-3.5 Turbo** | `gpt-3.5-turbo` | 💰 Econômico e versátil |
-| **Llama 3 70B** | `llama-3-70b` | 🔓 Open source via Groq |
-| **Mixtral 8x7B** | `mixtral-8x7b` | 🌍 Multilingual via Groq |
-
-### 🛠️ Ferramentas Integradas
-
-- **🧠 Raciocínio Avançado**: Capacidades de reasoning complexo
-- **📈 Dados Financeiros**: Integração YFinance para mercados
-- **🔍 Busca Web**: Pesquisas em tempo real via DuckDuckGo
-- **🐍 Execução Python**: Interpretador Python integrado
-- **📄 Manipulação de Arquivos**: I/O completo de arquivos
-
-### 🌐 API Endpoints Completos
-
-#### 🤖 Gestão de Agentes
-- `POST /api/agents/create` - Criar novo agente
-- `GET /api/agents` - Listar com paginação e filtros
-- `GET /api/agents/search` - Busca avançada
-- `GET /api/agents/{id}` - Obter agente específico
-- `DELETE /api/agents/{id}` - Excluir agente
-- `GET /api/agents/{id}/verify` - Verificar integridade
-- `POST /api/agents/{id}/test` - Teste rápido
-- `POST /api/agents/{id}/unload` - Descarregar da memória
-
-#### 💬 Sistema de Chat
-- `POST /api/agents/{id}/chat/start` - Iniciar sessão
-- `POST /api/chat/{session_id}/message` - Enviar mensagem
-- `GET /api/chat/{session_id}/history` - Histórico completo
-- `DELETE /api/chat/{session_id}` - Finalizar sessão
-
-#### 📊 Sistema e Monitoramento
-- `GET /health` - Health check completo
-- `GET /api/system/stats` - Estatísticas detalhadas
-- `GET /api/config` - Configurações ativas
-- `POST /api/system/maintenance` - Manutenção automática
-- `POST /api/drizzy/test` - Teste integração Drizzy
-
-### 🗄️ Persistência de Dados
-
-- **SQLite** (padrão): Pronto para uso, zero configuração
-- **PostgreSQL**: Recomendado para produção
-- **MySQL**: Suporte completo via SQLAlchemy
-- **Migrations**: Sistema automático de versionamento
-- **Backup Ready**: Estrutura preparada para backup
-
-## 🎨 Interface Moderna
-
-### ✨ Design System
-- **🌌 Glassmorphism**: Efeitos de vidro com blur e transparência
-- **🎭 Dark Theme**: Tema escuro otimizado para desenvolvedores
-- **📱 Mobile First**: Design responsivo para todos os dispositivos
-- **⚡ Micro-interactions**: Animações suaves e feedback visual
-- **🎯 Accessibility**: WCAG 2.1 compliant com ARIA labels
-
-### 🔧 Funcionalidades da Interface
-- **📊 Dashboard Visual**: Status do sistema em tempo real
-- **🔍 Busca Inteligente**: Busca instantânea com highlighting
-- **📋 Múltiplas Visualizações**: Grid e lista com controles
-- **💾 Auto-save**: Salvamento automático de dados
-- **🔔 Sistema de Notificações**: Toast multi-tipo com persistência
-- **⚡ Quick Actions**: Botões flutuantes para ações frequentes
-- **📈 Progress Tracking**: Barras de progresso e loading states
-- **🎨 Syntax Highlighting**: Código com cores e formatação
-- **📋 Copy/Download**: Facilita compartilhamento de código
-
-### 🚀 Performance
-- **⚡ Lazy Loading**: Carregamento sob demanda
-- **🔄 Virtual Scrolling**: Listas grandes otimizadas
-- **💾 Caching Inteligente**: Cache de dados e interface
-- **📱 Touch Optimized**: Otimizada para dispositivos touch
-
-## 🔒 Segurança Enterprise
-
-### 🛡️ Validação e Sanitização
-- **Pydantic Models**: Validação rigorosa de tipos e formatos
-- **SQL Injection Protection**: ORM SQLAlchemy com prepared statements
-- **XSS Protection**: Sanitização completa de inputs e outputs
-- **Input Validation**: Limites de tamanho e formato
-- **File Upload Security**: Validação de tipos e tamanhos
-
-### 🔐 Configuração Segura
-- **Environment Variables**: Secrets via .env (não commitados)
-- **CORS Configurável**: Origins específicos para produção
-- **API Key Validation**: Verificação em tempo real
-- **Session Management**: Tokens seguros e expiração automática
-- **Error Sanitization**: Logs detalhados sem exposição de dados
-
-### 📊 Auditoria e Monitoramento
-- **Activity Logging**: Todas as ações são registradas
-- **Error Tracking**: Stack traces completos para debugging
-- **Health Monitoring**: Verificação contínua de componentes
-- **Performance Metrics**: Monitoramento de performance
-
-## 🚀 Exemplo de Uso
+### 💬 2. Chat com Agentes
 
 ```python
-# Código gerado pelo sistema
+# Exemplo de uso do SDK gerado
+from generated_agent import SalesAgent
+
+agent = SalesAgent()
+response = agent.process_message(
+    message="Quero saber sobre os produtos",
+    user_id="123",
+    context={"source": "whatsapp"}
+)
+print(response)
+```
+
+### 📅 3. Agendamento Inteligente
+
+```python
+# Agente com Google Calendar
+agent = SchedulingAgent()
+response = agent.schedule_appointment(
+    message="Quero agendar uma consulta na próxima semana",
+    user_email="cliente@email.com"
+)
+```
+
+## 🧠 Modelos de IA Suportados
+
+| Modelo | Provider | Código | Características |
+|--------|----------|--------|------------------|
+| **Claude 3 Sonnet** | Anthropic | `claude-3-sonnet-20240229` | ⭐ Equilibrio perfeito |
+| **Claude 3 Haiku** | Anthropic | `claude-3-haiku-20240307` | ⚡ Rápido e eficiente |
+| **GPT-4** | OpenAI | `gpt-4` | 💪 Poderoso e versátil |
+| **GPT-3.5 Turbo** | OpenAI | `gpt-3.5-turbo` | 💰 Econômico |
+| **Llama 3 70B** | Groq | `llama3-70b-8192` | 🔓 Open source |
+| **Mixtral 8x7B** | Groq | `mixtral-8x7b-32768` | 🌍 Multilingual |
+
+## 🔧 API Reference
+
+### 🤖 Gestão de Agentes SDK
+
+```bash
+# Criar agente SDK
+POST /api/agents/sdk/create
+
+# Listar agentes
+GET /api/agents/sdk
+
+# Obter agente específico
+GET /api/agents/sdk/{agent_id}
+
+# Deletar agente
+DELETE /api/agents/sdk/{agent_id}
+
+# Testar agente
+POST /api/agents/sdk/{agent_id}/test
+```
+
+### 💬 Sistema de Chat
+
+```bash
+# Iniciar sessão de chat
+POST /api/agents/{agent_id}/chat/start
+
+# Enviar mensagem
+POST /api/chat/{session_id}/message
+
+# Histórico da conversa
+GET /api/chat/{session_id}/history
+
+# Finalizar sessão
+DELETE /api/chat/{session_id}
+```
+
+### 📱 Integrações
+
+```bash
+# WhatsApp (Evolution API)
+POST /api/integrations/whatsapp/send
+GET /api/integrations/whatsapp/status
+
+# Google Calendar
+POST /api/integrations/calendar/events
+GET /api/integrations/calendar/available-slots
+
+# E-mail
+POST /api/integrations/email/send
+GET /api/integrations/email/templates
+
+# Pagamentos
+POST /api/integrations/payments/stripe/create-payment
+POST /api/integrations/payments/asaas/create-payment
+```
+
+## 🔒 Segurança e Boas Práticas
+
+### 🛡️ Segurança Enterprise
+
+- **Validação Rigorosa**: Pydantic models para todos os inputs
+- **SQL Injection Protection**: SQLAlchemy ORM com prepared statements
+- **XSS Protection**: Sanitização de dados de entrada e saída
+- **CORS Configurável**: Origins específicos para produção
+- **Rate Limiting**: Proteção contra abuse de API
+
+### 🔐 Configuração de Produção
+
+```env
+# Produção
+ENVIRONMENT=production
+DEBUG=false
+LOG_LEVEL=WARNING
+SECRET_KEY=sua-chave-super-forte-256-bits
+CORS_ORIGINS=https://seu-dominio.com
+
+# Banco de dados
+DATABASE_URL=postgresql://user:pass@localhost:5432/agents
+
+# SSL/TLS
+SSL_CERT_PATH=/path/to/cert.pem
+SSL_KEY_PATH=/path/to/key.pem
+```
+
+## 📊 Monitoramento e Logs
+
+### 📈 Métricas Disponíveis
+
+```bash
+# Estatísticas gerais
+curl http://localhost:8000/api/system/stats
+
+# Health check detalhado
+curl http://localhost:8000/health
+
+# Logs em tempo real
+tail -f app.log
+
+# Métricas de agentes
+curl http://localhost:8000/api/agents/metrics
+```
+
+### 🔍 Debugging
+
+```env
+# Ativar debug mode
+DEBUG=true
+LOG_LEVEL=DEBUG
+DATABASE_ECHO=true
+```
+
+## 🚀 Exemplos de Código
+
+### 📱 Agente WhatsApp + Vendas
+
+```python
 from agno.agent import Agent
 from agno.models.anthropic import Claude
-from agno.tools.reasoning import ReasoningTools
+from services.evolution_api_service import EvolutionAPIService
+from services.payment_service import PaymentManager
 
-class AssistenteFinanceiroAgent:
+class WhatsAppSalesAgent:
     def __init__(self):
         self.model = Claude(id="claude-3-sonnet-20240229")
-        self.tools = [
-            ReasoningTools(add_instructions=True),
-        ]
+        self.whatsapp = EvolutionAPIService()
+        self.payments = PaymentManager()
+        
         self.agent = Agent(
             model=self.model,
-            tools=self.tools,
+            tools=[self.whatsapp, self.payments],
             instructions=[
-                "Você é um assistente financeiro especializado",
-                "Sempre use dados precisos e atualizados",
-            ],
-            markdown=True,
-            reasoning=True,
+                "Você é um vendedor especializado via WhatsApp",
+                "Sempre confirme informações antes de processar pagamentos",
+                "Use emojis para tornar a conversa mais amigável"
+            ]
         )
     
-    def run(self, message: str, **kwargs):
-        return self.agent.print_response(message, stream=True)
+    def process_whatsapp_message(self, message, phone_number):
+        context = {"source": "whatsapp", "phone": phone_number}
+        response = self.agent.run(message, context=context)
+        return response
+```
+
+### 📅 Agente de Agendamento
+
+```python
+from services.calendar_service import GoogleCalendarService
+
+class SchedulingAgent:
+    def __init__(self):
+        self.calendar = GoogleCalendarService()
+        self.agent = Agent(
+            model=Claude(id="claude-3-haiku-20240307"),
+            tools=[self.calendar],
+            instructions=[
+                "Você é um assistente de agendamento inteligente",
+                "Sempre verifique disponibilidade antes de confirmar",
+                "Envie lembretes automáticos"
+            ]
+        )
+    
+    def schedule_appointment(self, message, user_email):
+        return self.agent.run(message, user_email=user_email)
+```
+
+## 🔧 Desenvolvimento e Customização
+
+### 🛠️ Adicionando Novos Serviços
+
+1. Crie um arquivo em `backend/services/`
+2. Implemente a interface de serviço
+3. Adicione configurações no `.env`
+4. Registre no `main.py`
+
+```python
+# backend/services/custom_service.py
+class CustomService:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+    
+    async def process(self, data: dict) -> dict:
+        # Sua lógica personalizada
+        return {"result": "processed"}
+```
+
+### 🎨 Customizando a Interface
+
+A interface usa HTML/CSS/JS vanilla para máxima flexibilidade:
+
+```css
+/* Personalizar tema */
+:root {
+    --primary-color: #your-brand-color;
+    --secondary-color: #your-secondary-color;
+    --glass-bg: rgba(255, 255, 255, 0.1);
+}
 ```
 
 ## 🤝 Contribuição
 
 ### 🚀 Como Contribuir
 
-1. **🍴 Fork** o repositório
-2. **🌿 Clone** sua fork localmente
-```bash
-git clone https://github.com/seu-usuario/gerador-de-agentes.git
-cd gerador-de-agentes
-```
-3. **🌱 Crie** uma branch para sua feature
-```bash
-git checkout -b feature/sua-nova-funcionalidade
-```
-4. **💻 Desenvolva** seguindo os padrões do projeto
-5. **✅ Teste** suas alterações
-6. **📝 Commit** com mensagens descritivas
-```bash
-git commit -m "feat: adiciona funcionalidade X"
-```
-7. **🚀 Push** para sua branch
-```bash
-git push origin feature/sua-nova-funcionalidade
-```
-8. **🔄 Abra** um Pull Request
+1. **Fork** o repositório
+2. **Clone** sua fork: `git clone https://github.com/seu-usuario/geradorsdk.git`
+3. **Branch**: `git checkout -b feature/nova-funcionalidade`
+4. **Desenvolva** seguindo os padrões do projeto
+5. **Teste** suas alterações
+6. **Commit**: `git commit -m "feat: adiciona nova funcionalidade"`
+7. **Push**: `git push origin feature/nova-funcionalidade`
+8. **Pull Request** com descrição detalhada
 
-### 📋 Guidelines
+### 📋 Guidelines de Desenvolvimento
 
-- **Code Style**: Siga PEP 8 para Python e ES6+ para JavaScript
+- **Code Style**: PEP 8 para Python, ES6+ para JavaScript
 - **Testes**: Adicione testes para novas funcionalidades
-- **Documentação**: Atualize documentação quando necessário
-- **Commits**: Use conventional commits (feat:, fix:, docs:, etc.)
-- **Issues**: Reporte bugs e sugira melhorias via Issues
+- **Documentação**: Atualize docs quando necessário
+- **Commits**: Use conventional commits (feat:, fix:, docs:)
+- **Issues**: Reporte bugs e sugira melhorias
+
+### 🧪 Executando Testes
+
+```bash
+# Instalar dependências de teste
+pip install pytest pytest-asyncio
+
+# Executar testes
+pytest tests/
+
+# Coverage
+pytest --cov=backend tests/
+```
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo LICENSE para detalhes.
+Este projeto está licenciado sob a **MIT License**.
 
-### 🤝 Uso Comercial
+### ✅ Permissões
+- ✅ Uso comercial
+- ✅ Modificação
+- ✅ Distribuição
+- ✅ Uso privado
 
-- ✅ **Uso comercial permitido**
-- ✅ **Modificação e distribuição livre**
-- ✅ **Uso em projetos proprietários**
-- ⚠️ **Sem garantias expressas ou implícitas**
-- 📋 **Manter créditos originais**
+### ❌ Limitações
+- ❌ Responsabilidade
+- ❌ Garantia
+
+### 📋 Condições
+- 📋 Incluir licença e copyright
+
+Veja o arquivo [LICENSE](LICENSE) para detalhes completos.
+
+## 🌟 Roadmap
+
+### 🎯 v2.1 - Autenticação & Templates
+- [ ] Sistema de usuários e autenticação JWT
+- [ ] Biblioteca de templates de agentes
+- [ ] Dashboard analytics avançado
+- [ ] Multi-tenant support
+
+### 🎯 v2.2 - Escalabilidade
+- [ ] Containerização Docker completa
+- [ ] Deploy Kubernetes
+- [ ] Auto-scaling
+- [ ] Cache Redis distribuído
+
+### 🎯 v3.0 - AI-Powered Platform
+- [ ] Meta-agents (agentes que criam agentes)
+- [ ] Auto-otimização de performance
+- [ ] Knowledge base compartilhada
+- [ ] Aprendizado contínuo
+
+## 📞 Suporte
+
+### 🔧 Troubleshooting
+
+| Problema | Solução |
+|----------|---------|
+| **Porta em uso** | Altere `PORT=8001` no `.env` |
+| **API Key inválida** | Verifique configuração no `.env` |
+| **Banco não conecta** | Verifique `DATABASE_URL` |
+| **Módulo não encontrado** | Ative ambiente virtual |
+
+### 📚 Recursos de Ajuda
+
+- **📖 Documentação**: Consulte [SETUP.md](SETUP.md)
+- **✅ Checklist**: Veja [CHECKLIST.md](CHECKLIST.md)
+- **📋 Changelog**: [CHANGELOG.md](CHANGELOG.md)
+- **🐛 Issues**: [GitHub Issues](https://github.com/deveclipsy007/geradorsdk/issues)
+
+### 💡 Comunidade
+
+- **🌟 GitHub**: [deveclipsy007/geradorsdk](https://github.com/deveclipsy007/geradorsdk)
+- **📧 E-mail**: suporte@geradorsdk.com
+- **💬 Discord**: [Servidor da Comunidade](https://discord.gg/geradorsdk)
 
 ---
 
-## 🌟 Agradecimentos
+## 🙏 Agradecimentos
 
 ### 💎 Tecnologias Utilizadas
 
-- **[Agno](https://github.com/agno-ai/agno)** - Framework de agentes inteligentes
-- **[FastAPI](https://fastapi.tiangolo.com/)** - Framework web moderno e rápido
-- **[SQLAlchemy](https://www.sqlalchemy.org/)** - ORM Python de alta qualidade
-- **[Anthropic Claude](https://www.anthropic.com/)** - Modelos de linguagem avançados
-- **[OpenAI](https://openai.com/)** - GPT e tecnologias de IA
-- **[Groq](https://groq.com/)** - Processamento de IA ultrarrápido
+- **[Agno Framework](https://github.com/agno-ai/agno)** - Framework de agentes de nova geração
+- **[FastAPI](https://fastapi.tiangolo.com/)** - Framework web moderno e performático
+- **[SQLAlchemy](https://www.sqlalchemy.org/)** - ORM Python enterprise
+- **[Anthropic Claude](https://www.anthropic.com/)** - Modelos de IA avançados
+- **[OpenAI GPT](https://openai.com/)** - Modelos GPT-4 e GPT-3.5
+- **[Groq](https://groq.com/)** - Processamento ultrarrápido para Llama/Mixtral
 
-### ❤️ Comunidade
+### ❤️ Contributors
 
-Obrigado a todos os contribuidores, usuários e à comunidade open source que torna projetos como este possíveis.
+Obrigado a todos os contribuidores que tornam este projeto possível!
 
 ---
 
 <div align="center">
 
-**🚀 Pronto para criar agentes inteligentes? [Comece agora!](SETUP.md)**
+**🚀 Pronto para revolucionar seus agentes inteligentes?**
 
-[![GitHub stars](https://img.shields.io/github/stars/seu-usuario/gerador-de-agentes?style=social)](https://github.com/seu-usuario/gerador-de-agentes)
-[![GitHub forks](https://img.shields.io/github/forks/seu-usuario/gerador-de-agentes?style=social)](https://github.com/seu-usuario/gerador-de-agentes/fork)
-[![GitHub issues](https://img.shields.io/github/issues/seu-usuario/gerador-de-agentes)](https://github.com/seu-usuario/gerador-de-agentes/issues)
+[![⭐ Star no GitHub](https://img.shields.io/github/stars/deveclipsy007/geradorsdk?style=social)](https://github.com/deveclipsy007/geradorsdk)
+[![🍴 Fork](https://img.shields.io/github/forks/deveclipsy007/geradorsdk?style=social)](https://github.com/deveclipsy007/geradorsdk/fork)
+[![🐛 Issues](https://img.shields.io/github/issues/deveclipsy007/geradorsdk)](https://github.com/deveclipsy007/geradorsdk/issues)
+[![📝 Pull Requests](https://img.shields.io/github/issues-pr/deveclipsy007/geradorsdk)](https://github.com/deveclipsy007/geradorsdk/pulls)
 
-**✨ Se este projeto foi útil, considere dar uma ⭐ star!**
+**[🚀 Começar Agora](SETUP.md)** | **[📚 Documentação](https://docs.geradorsdk.com)** | **[🐛 Reportar Bug](https://github.com/deveclipsy007/geradorsdk/issues)**
 
 </div>
 
-## 🆘 Suporte e Troubleshooting
+---
 
-### 🔧 Verificações Básicas
-
-1. **🐍 Python**: Verifique se Python 3.8+ está instalado
-2. **📦 Dependências**: Execute `pip install -r requirements.txt`
-3. **🔑 API Keys**: Verifique configuração no `.env`
-4. **💾 Banco**: Deixe o sistema criar o banco automaticamente
-
-### 🔍 Debugging
-
-```bash
-# Health Check
-curl http://localhost:8000/health
-
-# Verificar configuração
-curl http://localhost:8000/api/config
-
-# Ver logs
-tail -f app.log
-
-# Estatísticas do sistema
-curl http://localhost:8000/api/system/stats
-```
-
-### 🐛 Problemas Comuns
-
-| Problema | Solução |
-|----------|----------|
-| **Porta em uso** | Altere `PORT=8001` no `.env` |
-| **API Key inválida** | Verifique as chaves no `.env` |
-| **Banco não conecta** | Verifique `DATABASE_URL` |
-| **Módulo não encontrado** | Ative o ambiente virtual |
-
-### 📞 Canais de Suporte
-
-- **📖 Documentação**: Consulte `SETUP.md` para guia completo
-- **✅ Checklist**: Veja `CHECKLIST.md` para funcionalidades
-- **📋 Changelog**: Consulte `CHANGELOG.md` para mudanças
-- **🐛 Issues**: Reporte problemas no GitHub
-- **💡 Discussions**: Perguntas e sugestões
-
-## 🔮 Roadmap v2.1+
-
-### 🎯 Próximas Funcionalidades
-
-#### v2.1 - Autenticação e Templates
-- [ ] **👤 Sistema de Usuários**: Login, registro e perfis
-- [ ] **📋 Templates de Agentes**: Biblioteca de templates prontos
-- [ ] **📊 Dashboard Analytics**: Métricas avançadas de uso
-- [ ] **🔐 Autenticação JWT**: Sistema de tokens seguro
-- [ ] **👥 Multi-tenant**: Suporte para múltiplas organizações
-
-#### v2.2 - Escalabilidade
-- [ ] **🐳 Docker Support**: Containerização completa
-- [ ] **☸️ Kubernetes**: Deploy para produção
-- [ ] **📈 Auto-scaling**: Escalabilidade automática
-- [ ] **🗄️ Redis Cache**: Cache distribuído
-- [ ] **📊 Prometheus/Grafana**: Monitoramento avançado
-
-#### v2.3 - Extensibilidade
-- [ ] **🧩 Plugin System**: Extensões de terceiros
-- [ ] **🔗 Webhooks Customizados**: Integrações personalizadas
-- [ ] **🤖 Agent Marketplace**: Compartilhamento de agentes
-- [ ] **🔄 CI/CD Integration**: Integração com pipelines
-- [ ] **📱 Mobile App**: Aplicativo nativo
-
-#### v3.0 - AI-Powered Platform
-- [ ] **🤖 Meta-Agents**: Agentes que criam outros agentes
-- [ ] **🧠 Auto-optimization**: Otimização automática de performance
-- [ ] **📚 Knowledge Base**: Base de conhecimento compartilhada
-- [ ] **🎓 Learning System**: Aprendizado contínuo dos agentes
-- [ ] **🌐 Multi-language**: Suporte para múltiplas linguagens
-
-### 🏆 Objetivos de Longo Prazo
-
-- **🌟 Torna-se a plataforma de referência** para criação de agentes
-- **🚀 Suporte enterprise** com SLA e suporte técnico
-- **🌍 Comunidade ativa** de desenvolvedores e usuários
-- **🔬 Pesquisa & Desenvolvimento** em parceria com universidades
-- **📈 Marketplace** de extensões e integrações
+<div align="center">
+<sub>Construído com ❤️ pela comunidade • Powered by Agno Framework</sub>
+</div>
