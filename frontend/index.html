@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Plataforma para criação de agentes SDK especializados em atendimento, agendamento e vendas">
+    <meta name="theme-color" content="#1d1d1f">
+    <title>SDK Agentes Especializados</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-headset"></i> SDK Agentes Especializados</h1>
+            <p class="subtitle">Agentes SDK para Atendimento, Agendamento e Vendas</p>
+            <div class="system-status" id="system-status">
+                <span class="status-indicator" id="status-indicator">🔄</span>
+                <span class="status-text" id="status-text">Verificando sistema...</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- Navigation Tabs -->
+            <div class="tabs">
+                <button class="tab-button active" data-tab="create">
+                    <i class="fas fa-plus"></i> Criar Agente SDK
+                </button>
+                <button class="tab-button" data-tab="integrations">
+                    <i class="fas fa-plug"></i> Gerenciar Integrações
+                </button>
+                <button class="tab-button" data-tab="list">
+                    <i class="fas fa-list"></i> Meus Agentes SDK
+                </button>
+                <button class="tab-button" data-tab="logs">
+                    <i class="fas fa-gear"></i> Logs
+                </button>
+            </div>
+
+            <!-- Create Agent Tab -->
+            <div class="tab-content active" id="create-tab">
+                <div class="form-container">
+                    <h2><i class="fas fa-cog"></i> Configuração do Agente SDK</h2>
+                    
+                    <form id="agent-form">
+                        <div class="form-group">
+                            <label for="agent-name">
+                                Nome do Agente SDK
+                                <span class="tooltip" title="Digite um nome descritivo para seu agente especializado">?</span>
+                            </label>
+                            <input type="text" id="agent-name" name="name" required 
+                                   placeholder="Ex: Assistente Atendimento WhatsApp"
+                                   maxlength="100">
+                            <small class="helper-text">Máximo 100 caracteres</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="agent-specialization">
+                                Especialização
+                                <span class="tooltip" title="Escolha o foco principal do seu agente SDK">?</span>
+                            </label>
+                            <select id="agent-specialization" name="specialization" required>
+                                <option value="">Selecione a especialização...</option>
+                                <option value="customer_service">🎧 Atendimento ao Cliente</option>
+                                <option value="scheduling">📅 Agendamento de Serviços</option>
+                                <option value="sales">💰 Processo de Vendas</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="agent-description">
+                                Descrição
+                                <span class="tooltip" title="Descreva o contexto e propósito específico deste agente SDK">?</span>
+                            </label>
+                            <textarea id="agent-description" name="description" required 
+                                      placeholder="Ex: Este agente SDK realiza atendimento via WhatsApp para uma empresa de serviços, com foco em resolver dúvidas e agendar serviços..."
+                                      maxlength="500"></textarea>
+                            <small class="helper-text">Máximo 500 caracteres - <span id="desc-counter">0</span>/500</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="agent-model">
+                                Modelo de IA
+                                <span class="tooltip" title="Escolha o modelo de IA que seu agente usará">?</span>
+                            </label>
+                            <select id="agent-model" name="model">
+                                <option value="anthropic/claude-3-sonnet-20240229" data-provider="anthropic">Claude 3 Sonnet (Recomendado)</option>
+                                <option value="anthropic/claude-3-haiku-20240307" data-provider="anthropic">Claude 3 Haiku (Rápido)</option>
+                                <option value="openai/gpt-4" data-provider="openai">GPT-4 (Poderoso)</option>
+                                <option value="openai/gpt-3.5-turbo" data-provider="openai">GPT-3.5 Turbo (Econômico)</option>
+                                <option value="groq/llama-3-70b" data-provider="groq">Llama 3 70B (Open Source)</option>
+                                <option value="groq/mixtral-8x7b" data-provider="groq">Mixtral 8x7B (Multilingual)</option>
+                            </select>
+                            <div id="model-warning" class="warning-message" style="display: none;">
+                                ⚠️ Verifique se você configurou a API key para este modelo
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="agent-instructions">
+                                Instruções Específicas
+                                <span class="tooltip" title="Instruções detalhadas sobre o comportamento e contexto do agente">?</span>
+                            </label>
+                            <textarea id="agent-instructions" name="instructions" required 
+                                      placeholder="Ex: Você é um agente de atendimento especializado. Sempre seja cordial, eficiente e focado em resolver o problema do cliente. Para agendamentos, colete: nome, telefone, tipo de serviço e horário preferido..."
+                                      rows="6"></textarea>
+                            <small class="helper-text">Instruções detalhadas para o comportamento do agente</small>
+                        </div>
+
+                        <!-- Seção de Integrações Avançada -->
+                        <div class="integration-section">
+                            <h3><i class="fas fa-puzzle-piece"></i> Configurações de Integrações</h3>
+                            
+                            <!-- WhatsApp via Evolution API -->
+                            <div class="integration-card whatsapp">
+                                <div class="integration-header">
+                                    <div class="integration-icon">📱</div>
+                                    <div class="integration-info">
+                                        <h4>WhatsApp via Evolution API</h4>
+                                        <p>Integração WhatsApp usando Evolution API com QR Code</p>
+                                    </div>
+                                    <label class="integration-toggle">
+                                        <input type="checkbox" id="enable-whatsapp">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="integration-config" id="whatsapp-config" style="display: none;">
+                                    <div class="config-grid">
+                                        <div class="config-field">
+                                            <label>Evolution API URL</label>
+                                            <input type="url" id="evolution-api-url" placeholder="http://localhost:8080" value="http://localhost:8080">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>API Key (opcional)</label>
+                                            <input type="password" id="evolution-api-key" placeholder="Chave da API Evolution">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>Nome da Instância</label>
+                                            <input type="text" id="evolution-instance-name" placeholder="sdk-agent-instance">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>Webhook URL</label>
+                                            <input type="url" id="evolution-webhook" placeholder="https://seusite.com/webhook">
+                                        </div>
+                                    </div>
+                                    <div class="qr-code-section" id="whatsapp-qr-section" style="display: none;">
+                                        <h5>QR Code para Conectar WhatsApp</h5>
+                                        <div class="qr-code-container">
+                                            <img id="whatsapp-qr-image" src="" alt="QR Code WhatsApp" style="max-width: 200px; display: none;">
+                                            <div id="qr-loading" class="loading-qr">🔄 Gerando QR Code...</div>
+                                        </div>
+                                        <p class="qr-instructions">Abra o WhatsApp no seu celular e escaneie o código QR</p>
+                                    </div>
+                                    <div class="integration-actions">
+                                        <button type="button" class="btn-secondary" id="generate-qr-btn" data-integration="whatsapp">
+                                            <i class="fas fa-qrcode"></i> Gerar QR Code
+                                        </button>
+                                        <button type="button" class="btn-secondary test-integration" data-integration="whatsapp">
+                                            <i class="fas fa-flask"></i> Testar Conexão
+                                        </button>
+                                        <button type="button" class="btn-primary save-integration" data-integration="whatsapp">
+                                            <i class="fas fa-save"></i> Salvar Configuração
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- APIs de Pagamento -->
+                            <div class="integration-card payments">
+                                <div class="integration-header">
+                                    <div class="integration-icon">💳</div>
+                                    <div class="integration-info">
+                                        <h4>APIs de Pagamento</h4>
+                                        <p>Stripe e Asaas para processamento de pagamentos</p>
+                                    </div>
+                                    <label class="integration-toggle">
+                                        <input type="checkbox" id="enable-payments">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="integration-config" id="payments-config" style="display: none;">
+                                    <!-- Stripe Configuration -->
+                                    <div class="provider-section">
+                                        <h5>🌍 Stripe (Global)</h5>
+                                        <div class="config-grid">
+                                            <div class="config-field">
+                                                <label>Stripe API Key</label>
+                                                <input type="password" id="stripe-api-key" placeholder="sk_test_...">
+                                            </div>
+                                            <div class="config-field">
+                                                <label>Webhook Secret (opcional)</label>
+                                                <input type="password" id="stripe-webhook-secret" placeholder="whsec_...">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Asaas Configuration -->
+                                    <div class="provider-section">
+                                        <h5>🇧🇷 Asaas (Brasil)</h5>
+                                        <div class="config-grid">
+                                            <div class="config-field">
+                                                <label>Asaas API Key</label>
+                                                <input type="password" id="asaas-api-key" placeholder="$aact_...">
+                                            </div>
+                                            <div class="config-field">
+                                                <label>Ambiente</label>
+                                                <select id="asaas-environment">
+                                                    <option value="sandbox">Sandbox (Teste)</option>
+                                                    <option value="production">Produção</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="integration-actions">
+                                        <button type="button" class="btn-secondary test-integration" data-integration="stripe">
+                                            <i class="fas fa-flask"></i> Testar Stripe
+                                        </button>
+                                        <button type="button" class="btn-secondary test-integration" data-integration="asaas">
+                                            <i class="fas fa-flask"></i> Testar Asaas
+                                        </button>
+                                        <button type="button" class="btn-primary save-integration" data-integration="payments">
+                                            <i class="fas fa-save"></i> Salvar Configuração
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Plataformas de Agendamento -->
+                            <div class="integration-card scheduling">
+                                <div class="integration-header">
+                                    <div class="integration-icon">📅</div>
+                                    <div class="integration-info">
+                                        <h4>Plataformas de Agendamento</h4>
+                                        <p>Integração com sistemas de agendamento populares</p>
+                                    </div>
+                                    <label class="integration-toggle">
+                                        <input type="checkbox" id="enable-scheduling">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="integration-config" id="scheduling-config" style="display: none;">
+                                    <div class="config-grid">
+                                        <div class="config-field">
+                                            <label>Plataforma</label>
+                                            <select id="scheduling-platform">
+                                                <option value="">Selecionar...</option>
+                                                <option value="calendly">Calendly</option>
+                                                <option value="acuity">Acuity Scheduling</option>
+                                                <option value="simplybook">SimplyBook.me</option>
+                                                <option value="setmore">Setmore</option>
+                                                <option value="custom">Sistema Personalizado</option>
+                                            </select>
+                                        </div>
+                                        <div class="config-field">
+                                            <label>API Key</label>
+                                            <input type="password" id="scheduling-api-key" placeholder="Sua API key">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>URL da API</label>
+                                            <input type="url" id="scheduling-api-url" placeholder="https://api.plataforma.com">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>Fuso Horário</label>
+                                            <select id="scheduling-timezone">
+                                                <option value="America/Sao_Paulo">São Paulo (GMT-3)</option>
+                                                <option value="America/New_York">Nova York (GMT-4)</option>
+                                                <option value="Europe/London">Londres (GMT+0)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="integration-actions">
+                                        <button type="button" class="btn-secondary test-integration" data-integration="calendly">
+                                            <i class="fas fa-flask"></i> Testar Conexão
+                                        </button>
+                                        <button type="button" class="btn-primary save-integration" data-integration="calendly">
+                                            <i class="fas fa-save"></i> Salvar Configuração
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CRM e Vendas -->
+                            <div class="integration-card sales">
+                                <div class="integration-header">
+                                    <div class="integration-icon">💼</div>
+                                    <div class="integration-info">
+                                        <h4>CRM e Sistemas de Vendas</h4>
+                                        <p>Integração com plataformas de CRM e vendas</p>
+                                    </div>
+                                    <label class="integration-toggle">
+                                        <input type="checkbox" id="enable-sales">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="integration-config" id="sales-config" style="display: none;">
+                                    <div class="config-grid">
+                                        <div class="config-field">
+                                            <label>Plataforma CRM</label>
+                                            <select id="crm-platform">
+                                                <option value="">Selecionar...</option>
+                                                <option value="hubspot">HubSpot</option>
+                                                <option value="salesforce">Salesforce</option>
+                                                <option value="pipedrive">Pipedrive</option>
+                                                <option value="rdstation">RD Station</option>
+                                                <option value="custom">Sistema Personalizado</option>
+                                            </select>
+                                        </div>
+                                        <div class="config-field">
+                                            <label>API Key</label>
+                                            <input type="password" id="crm-api-key" placeholder="Sua API key do CRM">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>URL da Instância</label>
+                                            <input type="url" id="crm-instance-url" placeholder="https://sua-instancia.crm.com">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>Pipeline ID</label>
+                                            <input type="text" id="crm-pipeline-id" placeholder="ID do pipeline de vendas">
+                                        </div>
+                                    </div>
+                                    <div class="integration-actions">
+                                        <button type="button" class="btn-secondary test-integration" data-integration="hubspot">
+                                            <i class="fas fa-flask"></i> Testar Conexão
+                                        </button>
+                                        <button type="button" class="btn-primary save-integration" data-integration="hubspot">
+                                            <i class="fas fa-save"></i> Salvar Configuração
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sistemas de Atendimento -->
+                            <div class="integration-card support">
+                                <div class="integration-header">
+                                    <div class="integration-icon">🎧</div>
+                                    <div class="integration-info">
+                                        <h4>Sistemas de Atendimento</h4>
+                                        <p>Integração com plataformas de suporte e atendimento</p>
+                                    </div>
+                                    <label class="integration-toggle">
+                                        <input type="checkbox" id="enable-support">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="integration-config" id="support-config" style="display: none;">
+                                    <div class="config-grid">
+                                        <div class="config-field">
+                                            <label>Plataforma</label>
+                                            <select id="support-platform">
+                                                <option value="">Selecionar...</option>
+                                                <option value="zendesk">Zendesk</option>
+                                                <option value="intercom">Intercom</option>
+                                                <option value="freshdesk">Freshdesk</option>
+                                                <option value="movidesk">Movidesk</option>
+                                                <option value="custom">Sistema Personalizado</option>
+                                            </select>
+                                        </div>
+                                        <div class="config-field">
+                                            <label>API Token</label>
+                                            <input type="password" id="support-api-token" placeholder="Token da API">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>Subdomain</label>
+                                            <input type="text" id="support-subdomain" placeholder="empresa">
+                                        </div>
+                                        <div class="config-field">
+                                            <label>Departamento ID</label>
+                                            <input type="text" id="support-department" placeholder="ID do departamento">
+                                        </div>
+                                    </div>
+                                    <div class="integration-actions">
+                                        <button type="button" class="btn-secondary test-integration" data-integration="zendesk">
+                                            <i class="fas fa-flask"></i> Testar Conexão
+                                        </button>
+                                        <button type="button" class="btn-primary save-integration" data-integration="zendesk">
+                                            <i class="fas fa-save"></i> Salvar Configuração
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" id="test-integrations-btn">
+                                <i class="fas fa-flask"></i> Testar Integrações
+                            </button>
+                            <button type="submit" class="btn-primary" id="generate-agent-btn">
+                                <i class="fas fa-magic"></i> Gerar Agente SDK
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Generated Code Display -->
+                <div id="generated-code" class="code-container" style="display: none;">
+                    <h3><i class="fas fa-code"></i> Código do Agente Gerado</h3>
+                    <div class="code-actions">
+                        <button id="copy-code" class="btn-secondary">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                        <button id="download-code" class="btn-secondary">
+                            <i class="fas fa-download"></i> Download
+                        </button>
+                    </div>
+                    <pre id="agent-code"></pre>
+                </div>
+            </div>
+
+            <!-- Integrations Management Tab -->
+            <div class="tab-content" id="integrations-tab">
+                <div class="integrations-container">
+                    <div class="integrations-header">
+                        <h2><i class="fas fa-plug"></i> Gerenciamento de Integrações</h2>
+                        <p>Configure e monitore todas as integrações ativas do sistema</p>
+                    </div>
+
+                    <div class="integrations-dashboard">
+                        <div class="integration-status-card">
+                            <h3>Status das Integrações</h3>
+                            <div class="status-grid" id="integration-status-grid">
+                                <div class="status-item whatsapp">
+                                    <i class="fab fa-whatsapp"></i>
+                                    <span>WhatsApp</span>
+                                    <div class="status-indicator offline"></div>
+                                </div>
+                                <div class="status-item scheduling">
+                                    <i class="fas fa-calendar"></i>
+                                    <span>Agendamento</span>
+                                    <div class="status-indicator offline"></div>
+                                </div>
+                                <div class="status-item sales">
+                                    <i class="fas fa-chart-line"></i>
+                                    <span>CRM/Vendas</span>
+                                    <div class="status-indicator offline"></div>
+                                </div>
+                                <div class="status-item support">
+                                    <i class="fas fa-headset"></i>
+                                    <span>Suporte</span>
+                                    <div class="status-indicator offline"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="integration-logs">
+                            <h3>Logs de Integração</h3>
+                            <div class="logs-container" id="integration-logs">
+                                <div class="log-entry">
+                                    <span class="log-time">10:30:15</span>
+                                    <span class="log-type info">INFO</span>
+                                    <span class="log-message">Sistema de integrações inicializado</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- List Agents Tab -->
+            <div class="tab-content" id="list-tab">
+                <div class="list-container">
+                    <div class="list-header">
+                        <h2><i class="fas fa-list"></i> Meus Agentes SDK</h2>
+                        <div class="search-container">
+                            <input type="text" id="search-agents" placeholder="Buscar agentes...">
+                            <button id="refresh-agents" class="btn-secondary">
+                                <i class="fas fa-sync"></i> Atualizar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="agents-grid" class="agents-grid">
+                        <!-- Agents will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Tab -->
+            <div class="tab-content" id="chat-tab">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <button id="chat-back-btn" class="btn-secondary"><i class="fas fa-arrow-left"></i> Voltar</button>
+                        <h2 id="chat-agent-title"><i class="fas fa-comments"></i> Conversa</h2>
+                        <div class="chat-session">
+                            <span id="chat-session-id-label"></span>
+                            <button id="chat-new-session" class="btn-secondary"><i class="fas fa-bolt"></i> Nova sessão</button>
+                        </div>
+                    </div>
+                    <div id="chat-messages" class="chat-messages"></div>
+                    <div class="chat-input">
+                        <input id="chat-text" type="text" placeholder="Digite sua mensagem..." />
+                        <button id="chat-send" class="btn-primary"><i class="fas fa-paper-plane"></i> Enviar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div class="tab-content" id="logs-tab">
+                <div class="logs-page">
+                    <div class="logs-header">
+                        <h2><i class="fas fa-gear"></i> Logs da Plataforma</h2>
+                        <div class="logs-filters">
+                            <select id="logs-level">
+                                <option value="">Nível: Todos</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="ERROR">ERROR</option>
+                                <option value="DEBUG">DEBUG</option>
+                            </select>
+                            <input id="logs-agent-id" type="text" placeholder="Agent ID (opcional)">
+                            <input id="logs-session-id" type="text" placeholder="Session ID (opcional)">
+                            <input id="logs-since" type="datetime-local" placeholder="Desde">
+                            <input id="logs-limit" type="number" min="1" max="1000" value="200" title="Limite">
+                            <button id="logs-refresh" class="btn-secondary"><i class="fas fa-rotate"></i> Atualizar</button>
+                            <label class="auto-refresh">
+                                <input type="checkbox" id="logs-autorefresh" checked>
+                                Auto
+                            </label>
+                        </div>
+                    </div>
+                    <div id="logs-output" class="logs-output"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay" style="display: none;">
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Gerando agente...</p>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast" style="display: none;">
+            <div class="toast-content">
+                <span class="toast-message"></span>
+                <button class="toast-close">&times;</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

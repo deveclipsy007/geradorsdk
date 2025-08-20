@@ -1,0 +1,15 @@
+{
+  "name": "Assistente WhatsApp Vendas",
+  "specialization": "sales",
+  "description": "Agente especializado em vendas via WhatsApp para empresa de tecnologia",
+  "model": "anthropic/claude-3-sonnet-20240229",
+  "instructions": "Você é um especialista em vendas via WhatsApp. Seja cordial, identifique necessidades do cliente e conduza para o fechamento da venda.",
+  "whatsapp_config": {
+    "token": "test_token_123",
+    "phone": "+5511999999999"
+  },
+  "scheduling_config": {
+    "platform": "calendly",
+    "api_key": "test_calendly_key"
+  }
+}
