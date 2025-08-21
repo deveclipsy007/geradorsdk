@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Debug - Sistema de Agentes</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1d1d1f;
+            color: #f2f2f7;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .test-button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        
+        .test-button:hover {
+            background: #0056b3;
+        }
+        
+        .test-result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .success { color: #30d158; }
+        .error { color: #ff453a; }
+        .warning { color: #ff9500; }
+        .info { color: #007aff; }
+    </style>
+</head>
+<body>
+    <h1>🐛 Teste de Debug - Sistema de Agentes</h1>
+    <p>Esta página permite testar as funções corrigidas do sistema.</p>
+
+    <div class="test-section">
+        <h2>1. Teste de Conectividade Backend</h2>
+        <p>Testa se o backend está respondendo corretamente.</p>
+        <button class="test-button" onclick="testBackendConnection()">Testar Conexão</button>
+        <div id="backend-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Teste de Carregamento de Agentes</h2>
+        <p>Testa se a listagem de agentes está funcionando.</p>
+        <button class="test-button" onclick="testLoadAgents()">Carregar Agentes</button>
+        <div id="agents-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Teste de Histórico de Chat (Simulado)</h2>
+        <p>Testa a função de carregamento de histórico com diferentes cenários.</p>
+        <button class="test-button" onclick="testChatHistory('valid-agent')">Agente Válido</button>
+        <button class="test-button" onclick="testChatHistory('invalid-agent')">Agente Inválido</button>
+        <button class="test-button" onclick="testChatHistory(null)">ID Nulo</button>
+        <div id="chat-result" class="test-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Teste de Status do Sistema</h2>
+        <p>Verifica o status geral do sistema.</p>
+        <button class="test-button" onclick="testSystemStatus()">Verificar Status</button>
+        <div id="status-result" class="test-result"></div>
+    </div>
+
+    <script>
+        // Configurações
+        const API_BASE_URL = 'http://localhost:8001/api';
+
+        // Função utilitária para fetch com timeout
+        async function fetchWithTimeout(url, options = {}) {
+            const { timeout = 10000, ...fetchOptions } = options;
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+            
+            try {
+                const response = await fetch(url, {
+                    ...fetchOptions,
+                    signal: controller.signal,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        ...fetchOptions.headers
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                return response;
+            } catch (error) {
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    throw new Error(`Timeout: Operação demorou mais de ${timeout/1000} segundos`);
+                }
+                throw error;
+            }
+        }
+
+        // Função para exibir resultados
+        function displayResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const timestamp = new Date().toLocaleTimeString();
+                element.innerHTML = `[${timestamp}] ${message}`;
+                element.className = `test-result ${type}`;
+            }
+        }
+
+        // Teste 1: Conectividade Backend
+        async function testBackendConnection() {
+            displayResult('backend-result', 'Testando conexão com backend...', 'info');
+            
+            try {
+                const response = await fetchWithTimeout(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResult('backend-result', 
+                        `✅ Backend conectado!\nStatus: ${data.status}\nVersão: ${data.version}\nBanco: ${data.database}\nAgentes: ${data.agents_count}`, 
+                        'success'
+                    );
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                displayResult('backend-result', 
+                    `❌ Erro de conexão: ${error.message}\n\nVerifique se o backend está rodando em localhost:8001`, 
+                    'error'
+                );
+            }
+        }
+
+        // Teste 2: Carregamento de Agentes
+        async function testLoadAgents() {
+            displayResult('agents-result', 'Carregando lista de agentes...', 'info');
+            
+            try {
+                const response = await fetchWithTimeout(`${API_BASE_URL}/agents`, {
+                    method: 'GET'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const agents = Array.isArray(data) ? data : (data.agents || []);
+                    
+                    displayResult('agents-result', 
+                        `✅ Agentes carregados com sucesso!\nTotal: ${agents.length}\n\n${agents.map(a => `- ${a.name} (${a.specialization})`).join('\n')}`, 
+                        'success'
+                    );
+                } else if (response.status === 404) {
+                    displayResult('agents-result', '⚠️ Nenhum agente encontrado (404)', 'warning');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                displayResult('agents-result', 
+                    `❌ Erro ao carregar agentes: ${error.message}`, 
+                    'error'
+                );
+            }
+        }
+
+        // Teste 3: Histórico de Chat
+        async function testChatHistory(agentId) {
+            displayResult('chat-result', `Testando histórico para agente: ${agentId || 'null'}...`, 'info');
+            
+            try {
+                if (!agentId) {
+                    throw new Error('ID do agente não fornecido');
+                }
+
+                const url = new URL(`${API_BASE_URL}/agents/${agentId}/history`);
+                url.searchParams.set('session_id', 'test-session');
+                url.searchParams.set('limit', '10');
+                
+                const response = await fetchWithTimeout(url.toString(), {
+                    method: 'GET'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResult('chat-result', 
+                        `✅ Histórico carregado!\nMensagens: ${data.messages?.length || 0}`, 
+                        'success'
+                    );
+                } else if (response.status === 404) {
+                    displayResult('chat-result', '⚠️ Agente não encontrado ou sem histórico', 'warning');
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                let errorType = 'error';
+                let message = `❌ Erro: ${error.message}`;
+                
+                if (error.message.includes('ID do agente')) {
+                    errorType = 'warning';
+                    message = '⚠️ ' + error.message;
+                }
+                
+                displayResult('chat-result', message, errorType);
+            }
+        }
+
+        // Teste 4: Status do Sistema
+        async function testSystemStatus() {
+            displayResult('status-result', 'Verificando status completo do sistema...', 'info');
+            
+            const tests = [
+                { name: 'Health Check', url: `${API_BASE_URL}/health` },
+                { name: 'Agents Endpoint', url: `${API_BASE_URL}/agents` },
+                { name: 'Logs Endpoint', url: `${API_BASE_URL}/logs` }
+            ];
+            
+            const results = [];
+            
+            for (const test of tests) {
+                try {
+                    const response = await fetchWithTimeout(test.url, {
+                        method: 'GET',
+                        timeout: 3000
+                    });
+                    
+                    if (response.ok) {
+                        results.push(`✅ ${test.name}: OK`);
+                    } else {
+                        results.push(`⚠️ ${test.name}: HTTP ${response.status}`);
+                    }
+                } catch (error) {
+                    results.push(`❌ ${test.name}: ${error.message}`);
+                }
+            }
+            
+            displayResult('status-result', results.join('\n'), 'info');
+        }
+
+        // Auto-executar teste de conexão ao carregar
+        window.addEventListener('load', () => {
+            setTimeout(testBackendConnection, 1000);
+        });
+    </script>
+</body>
+</html>

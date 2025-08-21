@@ -1,12 +1,44 @@
 // API Base URL
-const API_BASE_URL = 'http://localhost:8002/api';
+const API_BASE_URL = 'http://localhost:8001/api';
 
 // Configuration constants
 const CONFIG = {
     TOAST_DURATION: 3000,
     MAX_AGENT_NAME_LENGTH: 100,
-    MAX_DESCRIPTION_LENGTH: 500
+    MAX_DESCRIPTION_LENGTH: 500,
+    DEFAULT_TIMEOUT: 10000, // 10 segundos
+    CHAT_TIMEOUT: 30000,    // 30 segundos para chat
+    HEALTH_CHECK_INTERVAL: 30000 // 30 segundos
 };
+
+// Utility function for fetch with timeout
+async function fetchWithTimeout(url, options = {}) {
+    const { timeout = CONFIG.DEFAULT_TIMEOUT, ...fetchOptions } = options;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+        const response = await fetch(url, {
+            ...fetchOptions,
+            signal: controller.signal,
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8',
+                'Accept': 'application/json',
+                ...fetchOptions.headers
+            }
+        });
+        
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error(`Timeout: Operação demorou mais de ${timeout/1000} segundos`);
+        }
+        throw error;
+    }
+}
 
 // DOM Elements
 const tabButtons = document.querySelectorAll('.tab-button');
@@ -29,13 +61,28 @@ let logsAutoRefreshTimer = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
-    initializeTabs();
-    initializeEventListeners();
-    initializeIntegrations();
-    initializePaymentIntegrations();
-    initializeEvolutionAPI();
-    checkSystemHealth();
-    loadAgents();
+    console.log('Inicializando aplicação...');
+    
+    try {
+        initializeTabs();
+        initializeEventListeners();
+        initializeIntegrations();
+        initializePaymentIntegrations();
+        initializeEvolutionAPI();
+        
+        // Verificações iniciais
+        checkSystemHealth();
+        loadAgents();
+        
+        // Verificação periódica de saúde do sistema
+        setInterval(checkSystemHealth, CONFIG.HEALTH_CHECK_INTERVAL);
+        
+        console.log('Aplicação inicializada com sucesso!');
+        
+    } catch (error) {
+        console.error('Erro durante a inicialização:', error);
+        showToast('Erro durante a inicialização da aplicação', 'error');
+    }
 });
 
 // System health check
@@ -51,24 +98,47 @@ async function checkSystemHealth() {
         statusIndicator.textContent = '🔄';
         statusText.textContent = 'Verificando sistema...';
         
-        const response = await fetch(`${API_BASE_URL}/health`, {
+        const response = await fetchWithTimeout(`${API_BASE_URL}/health`, {
             method: 'GET',
-            timeout: 5000
+            timeout: 8000
         });
         
         if (response.ok) {
+            const data = await response.json();
             statusIndicator.textContent = '✓';
-            statusText.textContent = 'Sistema online';
+            statusText.textContent = `Sistema online (v${data.version || 'N/A'})`;
             statusIndicator.style.color = '#4CAF50';
+            
+            console.log('Sistema saudável:', data);
+            
+            // Verificar se há problemas reportados na resposta
+            if (data.database !== 'connected') {
+                showToast('Atenção: Problemas com o banco de dados detectados', 'warning');
+            }
+            
         } else {
-            throw new Error('Sistema indisponível');
+            throw new Error(`Sistema indisponível (HTTP ${response.status})`);
         }
     } catch (error) {
         statusIndicator.textContent = '⚠';
-        statusText.textContent = 'Sistema offline';
         statusIndicator.style.color = '#f44336';
-        console.warn('System health check failed:', error);
-        showToast('Sistema backend offline. Algumas funcionalidades podem não funcionar.', 'warning');
+        
+        if (error.name === 'AbortError') {
+            statusText.textContent = 'Sistema offline (timeout)';
+            console.warn('System health check timeout:', error);
+            showToast('Sistema backend não responde. Verificando conectividade...', 'warning');
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            statusText.textContent = 'Sistema offline (conexão)';
+            console.warn('Network error during health check:', error);
+            showToast('Não foi possível conectar ao backend. Verifique se está rodando na porta 8001.', 'error');
+        } else {
+            statusText.textContent = 'Sistema offline';
+            console.warn('System health check failed:', error);
+            showToast(`Sistema backend offline: ${error.message}`, 'warning');
+        }
+        
+        // Tentar novamente em 10 segundos
+        setTimeout(checkSystemHealth, 10000);
     }
 }
 
@@ -166,12 +236,7 @@ function initializeEventListeners() {
     if (chatBackBtn) chatBackBtn.addEventListener('click', () => switchTab('list'));
 
     const chatNewSessionBtn = document.getElementById('chat-new-session');
-    if (chatNewSessionBtn) chatNewSessionBtn.addEventListener('click', () => {
-        if (!currentChat.agentId) return;
-        currentChat.sessionId = generateSessionId();
-        updateChatHeader();
-        loadChatHistory(currentChat.agentId, currentChat.sessionId);
-    });
+    if (chatNewSessionBtn) chatNewSessionBtn.addEventListener('click', resetChatSession);
 
     // Logs listeners
     const logsRefreshBtn = document.getElementById('logs-refresh');
@@ -203,84 +268,209 @@ function updateCharacterCounter() {
 async function handleAgentFormSubmit(e) {
     e.preventDefault();
     
+    console.log('Iniciando criação de agente...');
+    
     const formData = new FormData(e.target);
+    
+    // Coleta dados básicos do formulário
     const agentData = {
         name: formData.get('name'),
         specialization: formData.get('specialization'),
         description: formData.get('description'),
         model: formData.get('model'),
         instructions: formData.get('instructions'),
-        whatsapp_config: {
-            token: document.getElementById('whatsapp-token').value,
-            phone: document.getElementById('whatsapp-phone').value
-        },
-        scheduling_config: {
-            platform: document.getElementById('scheduling-platform').value,
-            api_key: document.getElementById('scheduling-api-key').value
-        }
+        whatsapp_config: {},
+        scheduling_config: {}
     };
+    
+    // Coleta configurações de WhatsApp (se existirem)
+    const whatsappTokenEl = document.getElementById('whatsapp-token');
+    const whatsappPhoneEl = document.getElementById('whatsapp-phone');
+    const evolutionApiUrlEl = document.getElementById('evolution-api-url');
+    const evolutionInstanceEl = document.getElementById('evolution-instance-name');
+    
+    if (whatsappTokenEl || evolutionApiUrlEl) {
+        agentData.whatsapp_config = {
+            token: whatsappTokenEl?.value || '',
+            phone: whatsappPhoneEl?.value || '',
+            evolution_api_url: evolutionApiUrlEl?.value || '',
+            instance_name: evolutionInstanceEl?.value || ''
+        };
+    }
+    
+    // Coleta configurações de agendamento (se existirem)
+    const schedulingPlatformEl = document.getElementById('scheduling-platform');
+    const schedulingApiKeyEl = document.getElementById('scheduling-api-key');
+    
+    if (schedulingPlatformEl || schedulingApiKeyEl) {
+        agentData.scheduling_config = {
+            platform: schedulingPlatformEl?.value || '',
+            api_key: schedulingApiKeyEl?.value || ''
+        };
+    }
+    
+    console.log('Dados do agente coletados:', agentData);
     
     // Validate required fields
     if (!agentData.name || !agentData.specialization || !agentData.description || !agentData.instructions) {
-        showToast('Por favor, preencha todos os campos obrigatórios.', 'error');
+        const missingFields = [];
+        if (!agentData.name) missingFields.push('Nome');
+        if (!agentData.specialization) missingFields.push('Especialização');
+        if (!agentData.description) missingFields.push('Descrição');
+        if (!agentData.instructions) missingFields.push('Instruções');
+        
+        showToast(`Por favor, preencha os campos obrigatórios: ${missingFields.join(', ')}`, 'error');
         return;
     }
     
+    const submitBtn = document.getElementById('generate-agent-btn');
+    const originalBtnText = submitBtn ? submitBtn.textContent : '';
+    
     try {
+        console.log('Exibindo overlay de loading...');
         showLoadingOverlay();
         
-        const response = await fetch(`${API_BASE_URL}/agents`, {
+        if (submitBtn) {
+            submitBtn.textContent = '🔄 Criando Agente...';
+            submitBtn.disabled = true;
+        }
+        
+        console.log('Enviando requisição para API...');
+        const response = await fetchWithTimeout(`${API_BASE_URL}/agents`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(agentData)
+            body: JSON.stringify(agentData),
+            timeout: 30000 // 30 segundos para criação
         });
         
+        console.log('Resposta da API:', response.status, response.statusText);
+        
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Erro ao criar agente');
+            let errorMessage = 'Erro ao criar agente';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorMessage;
+                console.error('Erro detalhado da API:', errorData);
+            } catch (parseError) {
+                console.error('Erro ao parsear resposta de erro:', parseError);
+                errorMessage = `Erro HTTP ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
         }
         
         const result = await response.json();
+        console.log('Agente criado com sucesso:', result);
         
         currentAgentCode = result.code || 'Código não disponível';
         currentAgentName = agentData.name;
         
         // Show generated code
+        console.log('Exibindo código gerado...');
         showGeneratedCode();
-        showToast('Agente SDK criado com sucesso!', 'success');
+        showToast(`Agente SDK "${agentData.name}" criado com sucesso!`, 'success');
         
         // Reset form
+        console.log('Resetando formulário...');
         e.target.reset();
         updateCharacterCounter();
         
         // Reload agents list
+        console.log('Recarregando lista de agentes...');
         loadAgents();
         
     } catch (error) {
-        console.error('Error creating agent:', error);
-        showToast(`Erro ao criar agente: ${error.message}`, 'error');
+        console.error('Erro durante criação do agente:', error);
+        
+        let userMessage = 'Erro ao criar agente';
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            userMessage = 'Não foi possível conectar ao servidor. Verifique se o backend está rodando.';
+        } else if (error.message.includes('Timeout')) {
+            userMessage = 'Timeout na criação do agente. O processo pode estar demorado, tente novamente.';
+        } else {
+            userMessage = `Erro ao criar agente: ${error.message}`;
+        }
+        
+        showToast(userMessage, 'error');
+        
     } finally {
+        console.log('Finalizando processo de criação...');
         hideLoadingOverlay();
+        
+        if (submitBtn) {
+            submitBtn.textContent = originalBtnText;
+            submitBtn.disabled = false;
+        }
     }
 }
 
 // Load agents from API
 async function loadAgents() {
+    const refreshBtn = document.getElementById('refresh-agents');
+    const originalBtnText = refreshBtn ? refreshBtn.textContent : '';
+    
     try {
-        const response = await fetch(`${API_BASE_URL}/agents`);
-        
-        if (!response.ok) {
-            throw new Error('Erro ao carregar agentes');
+        // Visual feedback
+        if (refreshBtn) {
+            refreshBtn.textContent = 'Carregando...';
+            refreshBtn.disabled = true;
         }
         
-        agents = await response.json();
+        console.log('Carregando agentes...');
+        
+        const response = await fetchWithTimeout(`${API_BASE_URL}/agents`, {
+            method: 'GET'
+        });
+        
+        if (!response.ok) {
+            if (response.status === 404) {
+                // Nenhum agente encontrado - não é erro
+                agents = [];
+                displayAgents(agents);
+                return;
+            } else if (response.status === 500) {
+                throw new Error('Erro interno do servidor');
+            } else {
+                throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+            }
+        }
+        
+        const data = await response.json();
+        
+        // Validar se a resposta tem o formato esperado
+        if (Array.isArray(data)) {
+            agents = data;
+        } else if (data && Array.isArray(data.agents)) {
+            agents = data.agents;
+        } else {
+            console.warn('Formato de resposta inesperado:', data);
+            agents = [];
+        }
+        
+        console.log(`${agents.length} agentes carregados:`, agents);
         displayAgents(agents);
         
     } catch (error) {
         console.error('Error loading agents:', error);
-        showToast('Erro ao carregar agentes: ' + error.message, 'error');
+        
+        let errorMessage = 'Erro ao carregar agentes';
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMessage = 'Não foi possível conectar ao servidor para carregar os agentes';
+        } else if (error.message.includes('HTTP')) {
+            errorMessage = `Erro do servidor: ${error.message}`;
+        }
+        
+        showToast(errorMessage, 'error');
+        
+        // Em caso de erro, manter os agentes que já estavam carregados (se houver)
+        if (!agents || agents.length === 0) {
+            displayAgents([]); // Mostrar estado vazio
+        }
+        
+    } finally {
+        // Restaurar botão
+        if (refreshBtn) {
+            refreshBtn.textContent = originalBtnText;
+            refreshBtn.disabled = false;
+        }
     }
 }
 
@@ -360,18 +550,77 @@ function generateSessionId() {
     return 's_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// Reset chat session in case of persistent errors
+function resetChatSession() {
+    if (!currentChat.agentId) return;
+    
+    const oldSessionId = currentChat.sessionId;
+    currentChat.sessionId = generateSessionId();
+    
+    console.log(`Sessão resetada: ${oldSessionId} -> ${currentChat.sessionId}`);
+    
+    updateChatHeader();
+    
+    // Limpar mensagens da tela
+    const container = document.getElementById('chat-messages');
+    if (container) {
+        container.innerHTML = '<div class="system-message">Nova sessão iniciada</div>';
+    }
+    
+    showToast('Nova sessão de chat iniciada', 'info');
+}
+
 async function loadChatHistory(agentId, sessionId) {
     try {
+        // Verificar se o agentId é válido
+        if (!agentId) {
+            throw new Error('ID do agente não fornecido');
+        }
+
         const url = new URL(`${API_BASE_URL}/agents/${agentId}/history`);
         if (sessionId) url.searchParams.set('session_id', sessionId);
         url.searchParams.set('limit', '200');
-        const resp = await fetch(url.toString());
-        if (!resp.ok) throw new Error('Falha ao carregar histórico');
+        
+        console.log('Carregando histórico do chat...', { agentId, sessionId, url: url.toString() });
+        
+        const resp = await fetchWithTimeout(url.toString(), {
+            method: 'GET',
+            timeout: 10000
+        });
+        
+        if (!resp.ok) {
+            if (resp.status === 404) {
+                console.log('Nenhum histórico encontrado, criando nova conversa...');
+                renderChatMessages([]); // Renderizar conversa vazia
+                return;
+            } else if (resp.status === 500) {
+                throw new Error('Erro interno do servidor');
+            } else {
+                throw new Error(`Erro HTTP ${resp.status}: ${resp.statusText}`);
+            }
+        }
+        
         const data = await resp.json();
+        console.log('Histórico carregado:', data);
         renderChatMessages(data.messages || []);
+        
     } catch (e) {
-        console.error(e);
-        showToast('Erro ao carregar histórico do chat', 'error');
+        console.error('Erro ao carregar histórico:', e);
+        
+        // Diferentes mensagens de erro baseadas no tipo de erro
+        let errorMessage = 'Erro ao carregar histórico do chat';
+        if (e.name === 'TypeError' && e.message.includes('fetch')) {
+            errorMessage = 'Não foi possível conectar ao servidor. Verifique se o backend está rodando.';
+        } else if (e.message.includes('timeout')) {
+            errorMessage = 'Timeout ao carregar histórico. Tente novamente.';
+        } else if (e.message.includes('ID do agente')) {
+            errorMessage = 'Agente não selecionado. Por favor, selecione um agente primeiro.';
+        }
+        
+        showToast(errorMessage, 'error');
+        
+        // Renderizar conversa vazia em caso de erro
+        renderChatMessages([]);
     }
 }
 
@@ -402,29 +651,132 @@ async function sendChatMessage() {
         showToast('Selecione um agente para conversar', 'warning');
         return;
     }
+    
     const input = document.getElementById('chat-text');
+    const container = document.getElementById('chat-messages');
     const text = (input?.value || '').trim();
-    if (!text) return;
+    if (!text) {
+        showToast('Digite uma mensagem antes de enviar', 'warning');
+        return;
+    }
+    
+    // Desabilitar input durante o envio
+    const sendButton = document.getElementById('chat-send');
+    const originalButtonText = sendButton ? sendButton.textContent : '';
+    
     try {
-        // Optimistic append
-        const container = document.getElementById('chat-messages');
+        // Feedback visual de que a mensagem está sendo enviada
+        if (sendButton) {
+            sendButton.textContent = 'Enviando...';
+            sendButton.disabled = true;
+        }
+        if (input) {
+            input.disabled = true;
+        }
+        
+        console.log('Enviando mensagem...', { 
+            agentId: currentChat.agentId, 
+            sessionId: currentChat.sessionId, 
+            message: text 
+        });
+        
+        // Adicionar mensagem do usuário imediatamente (UI otimista)
         if (container) {
-            container.insertAdjacentHTML('beforeend', renderMessageBubble({ role: 'user', content: text, created_at: new Date().toISOString() }));
+            container.insertAdjacentHTML('beforeend', renderMessageBubble({ 
+                role: 'user', 
+                content: text, 
+                created_at: new Date().toISOString() 
+            }));
             container.scrollTop = container.scrollHeight;
         }
+        
+        // Limpar input imediatamente
         input.value = '';
 
-        const resp = await fetch(`${API_BASE_URL}/agents/${currentChat.agentId}/chat`, {
+        // Verificar se todos os dados necessários estão presentes
+        if (!currentChat.agentId || !currentChat.sessionId) {
+            throw new Error('Dados da sessão incompletos');
+        }
+
+        const requestBody = { 
+            message: text, 
+            session_id: currentChat.sessionId 
+        };
+        
+        console.log('Enviando requisição:', requestBody);
+        
+        const resp = await fetchWithTimeout(`${API_BASE_URL}/agents/${currentChat.agentId}/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: text, session_id: currentChat.sessionId })
+            body: JSON.stringify(requestBody),
+            timeout: CONFIG.CHAT_TIMEOUT
         });
-        if (!resp.ok) throw new Error('Falha ao enviar mensagem');
+        
+        if (!resp.ok) {
+            let errorMessage = 'Falha ao enviar mensagem';
+            
+            if (resp.status === 404) {
+                errorMessage = 'Agente não encontrado';
+            } else if (resp.status === 400) {
+                const errorData = await resp.json().catch(() => ({}));
+                errorMessage = errorData.detail || 'Dados da mensagem inválidos';
+            } else if (resp.status === 500) {
+                errorMessage = 'Erro interno do servidor';
+            } else if (resp.status === 503) {
+                errorMessage = 'Serviço temporariamente indisponível';
+            }
+            
+            throw new Error(`${errorMessage} (HTTP ${resp.status})`);
+        }
+        
         const data = await resp.json();
-        renderChatMessages(data.messages || []);
+        console.log('Resposta recebida:', data);
+        
+        // Renderizar todas as mensagens (incluindo a resposta do agente)
+        if (data.messages && Array.isArray(data.messages)) {
+            renderChatMessages(data.messages);
+        } else {
+            console.warn('Formato de resposta inesperado:', data);
+            showToast('Mensagem enviada, mas houve um problema ao carregar a resposta', 'warning');
+        }
+        
     } catch (e) {
-        console.error(e);
-        showToast('Erro ao enviar mensagem', 'error');
+        console.error('Erro ao enviar mensagem:', e);
+        
+        // Diferentes mensagens de erro baseadas no tipo de erro
+        let errorMessage = 'Erro ao enviar mensagem';
+        if (e.name === 'TypeError' && e.message.includes('fetch')) {
+            errorMessage = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+        } else if (e.message.includes('timeout')) {
+            errorMessage = 'Timeout ao enviar mensagem. O agente pode estar sobrecarregado.';
+        } else if (e.message.includes('Dados da sessão')) {
+            errorMessage = 'Erro na sessão. Tente iniciar uma nova conversa.';
+        } else if (e.message.includes('HTTP')) {
+            errorMessage = e.message; // Usar mensagem detalhada do servidor
+        }
+        
+        showToast(errorMessage, 'error');
+        
+        // Remover a mensagem do usuário que foi adicionada otimisticamente
+        const lastMessage = container?.querySelector('.message.user:last-child');
+        if (lastMessage) {
+            lastMessage.remove();
+        }
+        
+        // Restaurar o texto no input
+        if (input) {
+            input.value = text;
+        }
+        
+    } finally {
+        // Reabilitar controles
+        if (sendButton) {
+            sendButton.textContent = originalButtonText;
+            sendButton.disabled = false;
+        }
+        if (input) {
+            input.disabled = false;
+            input.focus(); // Focar novamente no input
+        }
     }
 }
 
@@ -451,11 +803,23 @@ function buildLogsQuery() {
 async function loadLogs() {
     try {
         const resp = await fetch(buildLogsQuery());
-        if (!resp.ok) throw new Error('Falha ao carregar logs');
+        if (!resp.ok) {
+            if (resp.status === 404) {
+                renderLogs(['Nenhum log encontrado. O arquivo de log ainda não foi criado.']);
+                return;
+            }
+            throw new Error(`Falha ao carregar logs: ${resp.status} ${resp.statusText}`);
+        }
         const data = await resp.json();
-        renderLogs(data.logs || data || []);
+        const logs = data.logs || data || [];
+        if (logs.length === 0) {
+            renderLogs(['Nenhum log disponível no momento.']);
+        } else {
+            renderLogs(logs);
+        }
     } catch (e) {
-        console.error(e);
+        console.error('Erro ao carregar logs:', e);
+        renderLogs([`Erro ao conectar com o servidor: ${e.message}`]);
         showToast('Erro ao carregar logs', 'error');
     }
 }

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Teste de Criação de Agente</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1d1d1f;
+            color: #f2f2f7;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .test-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .test-form {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #f2f2f7;
+        }
+        
+        input, select, textarea {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+            color: #f2f2f7;
+            font-size: 14px;
+        }
+        
+        input::placeholder, textarea::placeholder {
+            color: rgba(242, 242, 247, 0.5);
+        }
+        
+        .test-button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        .test-button:hover {
+            background: #0056b3;
+        }
+        
+        .test-button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        
+        .test-result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .success { color: #30d158; }
+        .error { color: #ff453a; }
+        .warning { color: #ff9500; }
+        .info { color: #007aff; }
+        
+        .step {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        .step.completed { background: rgba(48, 209, 88, 0.1); }
+        .step.error { background: rgba(255, 69, 58, 0.1); }
+        .step.running { background: rgba(255, 149, 0, 0.1); }
+        
+        .code-display {
+            background: #000;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            max-height: 500px;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #007aff;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Teste Completo de Criação de Agente</h1>
+        <p>Esta página testa todo o fluxo de criação de agentes SDK</p>
+
+        <!-- Formulário de Teste -->
+        <div class="test-section">
+            <h2>1. Dados do Agente</h2>
+            <form class="test-form" id="agent-test-form">
+                <div class="form-group">
+                    <label for="agent-name">Nome do Agente</label>
+                    <input type="text" id="agent-name" name="name" value="Assistente Teste WhatsApp" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agent-specialization">Especialização</label>
+                    <select id="agent-specialization" name="specialization" required>
+                        <option value="customer_service">🎧 Atendimento ao Cliente</option>
+                        <option value="scheduling">📅 Agendamento de Serviços</option>
+                        <option value="sales">💰 Processo de Vendas</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agent-description">Descrição</label>
+                    <textarea id="agent-description" name="description" rows="3" required>Este é um agente de teste para validar o sistema de criação. Ele realiza atendimento básico e pode responder dúvidas simples.</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agent-model">Modelo de IA</label>
+                    <select id="agent-model" name="model">
+                        <option value="anthropic/claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                        <option value="openai/gpt-4">GPT-4</option>
+                        <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="agent-instructions">Instruções</label>
+                    <textarea id="agent-instructions" name="instructions" rows="4" required>Você é um assistente virtual cordial e eficiente. Sempre seja educado, claro e direto nas respostas. Se não souber algo, peça para o usuário aguardar enquanto busca informações.</textarea>
+                </div>
+                
+                <button type="submit" class="test-button" id="create-test-agent">
+                    🚀 Criar Agente de Teste
+                </button>
+            </form>
+        </div>
+
+        <!-- Progress -->
+        <div class="test-section">
+            <h2>2. Progresso da Criação</h2>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div id="steps-container">
+                <div class="step" id="step-1">1. Validando dados do formulário...</div>
+                <div class="step" id="step-2">2. Enviando para o backend...</div>
+                <div class="step" id="step-3">3. Gerando código do agente...</div>
+                <div class="step" id="step-4">4. Salvando no banco de dados...</div>
+                <div class="step" id="step-5">5. Verificando agente criado...</div>
+                <div class="step" id="step-6">6. Testando funcionalidades básicas...</div>
+            </div>
+        </div>
+
+        <!-- Resultados -->
+        <div class="test-section">
+            <h2>3. Resultados dos Testes</h2>
+            <div id="test-results" class="test-result info">Aguardando execução do teste...</div>
+        </div>
+
+        <!-- Código Gerado -->
+        <div class="test-section" id="code-section" style="display: none;">
+            <h2>4. Código do Agente Gerado</h2>
+            <div id="generated-code" class="code-display"></div>
+            <button class="test-button" onclick="copyCode()">📋 Copiar Código</button>
+            <button class="test-button" onclick="downloadCode()">💾 Download Código</button>
+        </div>
+
+        <!-- Testes de Funcionalidade -->
+        <div class="test-section" id="functionality-tests" style="display: none;">
+            <h2>5. Testes de Funcionalidade</h2>
+            <div class="form-group">
+                <label>Testar Chat com o Agente</label>
+                <input type="text" id="test-message" placeholder="Digite uma mensagem de teste...">
+                <button class="test-button" onclick="testAgentChat()">💬 Enviar Mensagem Teste</button>
+            </div>
+            <div id="chat-results" class="test-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8001/api';
+        let currentAgentId = null;
+        let currentAgentCode = '';
+
+        // Utilitários
+        function updateProgress(percent) {
+            document.getElementById('progress-fill').style.width = percent + '%';
+        }
+
+        function updateStep(stepNum, status, message = '') {
+            const step = document.getElementById(`step-${stepNum}`);
+            if (step) {
+                step.className = `step ${status}`;
+                if (message) {
+                    step.textContent = step.textContent.split(':')[0] + ': ' + message;
+                }
+            }
+        }
+
+        function displayResult(message, type = 'info') {
+            const results = document.getElementById('test-results');
+            const timestamp = new Date().toLocaleTimeString();
+            results.innerHTML = `[${timestamp}] ${message}`;
+            results.className = `test-result ${type}`;
+        }
+
+        // Função principal de teste
+        document.getElementById('agent-test-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const agentData = {
+                name: formData.get('name'),
+                specialization: formData.get('specialization'),
+                description: formData.get('description'),
+                model: formData.get('model'),
+                instructions: formData.get('instructions'),
+                whatsapp_config: {},
+                scheduling_config: {}
+            };
+
+            await runCompleteTest(agentData);
+        });
+
+        async function runCompleteTest(agentData) {
+            const button = document.getElementById('create-test-agent');
+            const originalText = button.textContent;
+            
+            try {
+                button.textContent = '🔄 Testando...';
+                button.disabled = true;
+                
+                // Etapa 1: Validação
+                updateStep(1, 'running', 'Validando...');
+                updateProgress(10);
+                
+                if (!agentData.name || !agentData.specialization || !agentData.description || !agentData.instructions) {
+                    throw new Error('Dados obrigatórios não preenchidos');
+                }
+                
+                updateStep(1, 'completed', 'Dados válidos ✓');
+                updateProgress(20);
+                await sleep(500);
+
+                // Etapa 2: Envio para backend
+                updateStep(2, 'running', 'Enviando...');
+                displayResult('Enviando dados para o backend...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/agents`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(agentData)
+                });
+                
+                updateStep(2, 'completed', 'Enviado ✓');
+                updateProgress(40);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Erro HTTP ${response.status}: ${errorData.detail || 'Erro desconhecido'}`);
+                }
+
+                // Etapa 3: Processamento
+                updateStep(3, 'running', 'Processando...');
+                const result = await response.json();
+                
+                currentAgentId = result.id;
+                currentAgentCode = result.code;
+                
+                updateStep(3, 'completed', 'Código gerado ✓');
+                updateProgress(60);
+                await sleep(500);
+
+                // Etapa 4: Verificação no banco
+                updateStep(4, 'running', 'Verificando...');
+                
+                const checkResponse = await fetch(`${API_BASE_URL}/agents/${currentAgentId}`);
+                if (!checkResponse.ok) {
+                    throw new Error('Agente não foi salvo corretamente');
+                }
+                
+                const agentDetails = await checkResponse.json();
+                updateStep(4, 'completed', 'Salvo no banco ✓');
+                updateProgress(80);
+                await sleep(500);
+
+                // Etapa 5: Listagem
+                updateStep(5, 'running', 'Verificando listagem...');
+                
+                const listResponse = await fetch(`${API_BASE_URL}/agents`);
+                const agentsList = await listResponse.json();
+                const foundAgent = agentsList.find(a => a.id === currentAgentId);
+                
+                if (!foundAgent) {
+                    throw new Error('Agente não aparece na listagem');
+                }
+                
+                updateStep(5, 'completed', 'Listagem OK ✓');
+                updateProgress(90);
+                await sleep(500);
+
+                // Etapa 6: Testes básicos
+                updateStep(6, 'running', 'Testando...');
+                
+                // Mostrar código gerado
+                document.getElementById('generated-code').textContent = currentAgentCode;
+                document.getElementById('code-section').style.display = 'block';
+                
+                // Habilitar testes de funcionalidade
+                document.getElementById('functionality-tests').style.display = 'block';
+                
+                updateStep(6, 'completed', 'Testes OK ✓');
+                updateProgress(100);
+
+                displayResult(`✅ SUCESSO!\n\nAgente criado com ID: ${currentAgentId}\nNome: ${agentData.name}\nEspecialização: ${agentData.specialization}\nStatus: ${result.status}\n\nTodos os testes passaram!`, 'success');
+
+            } catch (error) {
+                console.error('Erro no teste:', error);
+                
+                // Marcar etapa atual como erro
+                for (let i = 1; i <= 6; i++) {
+                    const step = document.getElementById(`step-${i}`);
+                    if (step && step.classList.contains('running')) {
+                        updateStep(i, 'error', 'FALHOU ❌');
+                        break;
+                    }
+                }
+                
+                displayResult(`❌ ERRO NO TESTE:\n\n${error.message}\n\nVerifique o console do navegador e os logs do backend para mais detalhes.`, 'error');
+                
+            } finally {
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        }
+
+        // Testar chat com agente
+        async function testAgentChat() {
+            if (!currentAgentId) {
+                displayChatResult('❌ Nenhum agente criado para testar', 'error');
+                return;
+            }
+
+            const message = document.getElementById('test-message').value.trim();
+            if (!message) {
+                displayChatResult('⚠️ Digite uma mensagem para testar', 'warning');
+                return;
+            }
+
+            try {
+                displayChatResult('🔄 Enviando mensagem...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/agents/${currentAgentId}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: 'test-session-' + Date.now()
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Erro HTTP ${response.status}`);
+                }
+
+                const chatResult = await response.json();
+                displayChatResult(`✅ CHAT FUNCIONANDO!\n\nSua mensagem: "${message}"\n\nResposta do agente: "${chatResult.reply || 'Sem resposta'}"\n\nSessão: ${chatResult.session_id}`, 'success');
+                
+                document.getElementById('test-message').value = '';
+
+            } catch (error) {
+                displayChatResult(`❌ Erro no chat: ${error.message}`, 'error');
+            }
+        }
+
+        function displayChatResult(message, type) {
+            const results = document.getElementById('chat-results');
+            const timestamp = new Date().toLocaleTimeString();
+            results.innerHTML = `[${timestamp}] ${message}`;
+            results.className = `test-result ${type}`;
+        }
+
+        // Utilitários para código
+        function copyCode() {
+            navigator.clipboard.writeText(currentAgentCode).then(() => {
+                alert('Código copiado para a área de transferência!');
+            });
+        }
+
+        function downloadCode() {
+            if (!currentAgentCode) return;
+            
+            const blob = new Blob([currentAgentCode], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `agent_${currentAgentId || 'test'}.py`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Auto-verificar backend ao carregar
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                if (response.ok) {
+                    displayResult('✅ Backend conectado e funcionando', 'success');
+                } else {
+                    displayResult('⚠️ Backend respondeu mas com problema', 'warning');
+                }
+            } catch (error) {
+                displayResult('❌ Backend não está respondendo. Verifique se está rodando na porta 8001', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

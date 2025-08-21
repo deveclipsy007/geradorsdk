@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 import logging
 from decimal import Decimal
+import httpx
+import asyncio
 
 # Imports dos módulos
 from config import config
@@ -234,22 +236,177 @@ async def get_sdk_agent(agent_id: str):
         raise HTTPException(status_code=500, detail=f"Erro ao buscar agente: {str(e)}")
 
 # ==========================================
+# AGENT LLM INTEGRATION
+# ==========================================
+
+async def generate_agent_response(agent_data, user_message: str, chat_history: List[Dict] = None) -> str:
+    """Gera resposta do agente usando o LLM especificado"""
+    try:
+        model = agent_data.model
+        instructions = agent_data.instructions or "Você é um assistente útil."
+        agent_name = agent_data.name
+        specialization = agent_data.specialization
+        description = agent_data.description
+        
+        # Construir contexto do agente
+        system_prompt = f"""Você é {agent_name}, um agente especializado em {specialization}.
+
+Descrição: {description}
+
+Instruções específicas: {instructions}
+
+Responda de forma natural, útil e consistente com sua especialização. Mantenha um tom profissional mas amigável."""
+
+        # Preparar histórico de conversa se disponível
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        if chat_history:
+            for msg in chat_history[-10:]:  # Últimas 10 mensagens para contexto
+                if msg.get('role') in ['user', 'assistant']:
+                    messages.append({
+                        "role": msg['role'], 
+                        "content": msg['content']
+                    })
+        
+        # Adicionar mensagem atual do usuário
+        messages.append({"role": "user", "content": user_message})
+        
+        # Determinar provedor baseado no modelo
+        if "anthropic" in model or "claude" in model:
+            return await call_anthropic_api(messages, model)
+        elif "openai" in model or "gpt" in model:
+            return await call_openai_api(messages, model)
+        elif "groq" in model:
+            return await call_groq_api(messages, model)
+        else:
+            # Fallback para resposta padrão se modelo não reconhecido
+            return f"Olá! Sou {agent_name}, especializado em {specialization}. Como posso ajudá-lo hoje?"
+            
+    except Exception as e:
+        logger.error(f"Erro ao gerar resposta do agente: {str(e)}")
+        return f"Desculpe, estou com dificuldades técnicas no momento. Como {agent_data.name}, tentarei ajudá-lo da melhor forma possível."
+
+async def call_anthropic_api(messages: List[Dict], model: str) -> str:
+    """Chama a API da Anthropic/Claude"""
+    try:
+        # Separar system message das outras mensagens
+        system_message = ""
+        conversation_messages = []
+        
+        for msg in messages:
+            if msg["role"] == "system":
+                system_message = msg["content"]
+            else:
+                conversation_messages.append(msg)
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": config.ANTHROPIC_API_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                },
+                json={
+                    "model": model.replace("anthropic/", ""),
+                    "max_tokens": 1000,
+                    "system": system_message,
+                    "messages": conversation_messages
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result["content"][0]["text"]
+    except Exception as e:
+        logger.error(f"Erro na API Anthropic: {str(e)}")
+        raise
+
+async def call_openai_api(messages: List[Dict], model: str) -> str:
+    """Chama a API da OpenAI"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {config.OPENAI_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": model.replace("openai/", ""),
+                    "messages": messages,
+                    "max_tokens": 1000,
+                    "temperature": 0.7
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+    except Exception as e:
+        logger.error(f"Erro na API OpenAI: {str(e)}")
+        raise
+
+async def call_groq_api(messages: List[Dict], model: str) -> str:
+    """Chama a API do Groq"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {config.GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": model.replace("groq/", ""),
+                    "messages": messages,
+                    "max_tokens": 1000,
+                    "temperature": 0.7
+                },
+                timeout=30.0
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+    except Exception as e:
+        logger.error(f"Erro na API Groq: {str(e)}")
+        raise
+
+# ==========================================
 # CHAT ENDPOINTS
 # ==========================================
+
 
 @app.post("/api/agents/{agent_id}/chat", response_model=ChatResponse)
 async def chat_with_agent(agent_id: str, chat: ChatRequest):
     """Envia mensagem ao agente e retorna a resposta com histórico da sessão"""
     try:
         from sqlalchemy import text
-        # Verificar se o agente existe
+        # Verificar se o agente existe e buscar suas configurações
         with get_db_session() as db:
-            result = db.execute(text("SELECT id, name, model FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
-            row = result.first()
-            if not row:
+            result = db.execute(text("SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
+            agent_data = result.first()
+            if not agent_data:
                 raise HTTPException(status_code=404, detail="Agente não encontrado")
 
         session_id = chat.session_id or str(uuid.uuid4())
+
+        # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
+        with get_db_session() as db:
+            history_result = db.execute(text(
+                """
+                SELECT role, content FROM chat_messages
+                WHERE agent_id = :agent_id AND session_id = :session_id
+                ORDER BY created_at ASC
+                """
+            ), {"agent_id": agent_id, "session_id": session_id})
+            
+            chat_history = []
+            for row in history_result:
+                chat_history.append({"role": row.role, "content": row.content})
+
+        # Gerar resposta inteligente do agente usando LLM
+        agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
 
         # Persistir mensagem do usuário
         with get_db_session() as db:
@@ -266,10 +423,6 @@ async def chat_with_agent(agent_id: str, chat: ChatRequest):
                 "role": "user",
                 "content": chat.message,
             })
-
-        # Geração de resposta do agente (placeholder)
-        # TODO: Integrar com mecanismo de LLM/Agente real conforme configuração do agente
-        agent_reply = f"Recebido: {chat.message}"
 
         # Persistir resposta do agente
         with get_db_session() as db:
@@ -307,7 +460,7 @@ async def chat_with_agent(agent_id: str, chat: ChatRequest):
                     user_id=r.user_id,
                     role=r.role,
                     content=r.content,
-                    created_at=r.created_at.isoformat() if r.created_at else None
+                    created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None)
                 ))
 
         logger.info(f"chat_message agent_id={agent_id} session_id={session_id} len={len(messages)}")
@@ -355,7 +508,7 @@ async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limi
                     user_id=r.user_id,
                     role=r.role,
                     content=r.content,
-                    created_at=r.created_at.isoformat() if r.created_at else None
+                    created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None)
                 ))
 
         # Retornar em ordem cronológica

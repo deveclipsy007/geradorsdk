@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 Teste Específico do Formulário Principal</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1d1d1f;
+            color: #f2f2f7;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: 600;
+        }
+        
+        .button:hover {
+            background: #0056b3;
+        }
+        
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .success { color: #30d158; }
+        .error { color: #ff453a; }
+        .warning { color: #ff9500; }
+        .info { color: #007aff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Teste Específico do Formulário Principal</h1>
+        <p>Este teste verifica especificamente o que acontece quando você tenta criar um agente no formulário principal.</p>
+
+        <div class="test-section">
+            <h2>1. Verificar se o script.js está carregado</h2>
+            <button class="button" onclick="checkMainScript()">Verificar Script Principal</button>
+            <div id="script-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Simular preenchimento do formulário principal</h2>
+            <button class="button" onclick="simulateMainForm()">Simular Formulário</button>
+            <div id="form-sim-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Interceptar e debugar o evento de submit</h2>
+            <button class="button" onclick="setupFormDebugging()">Setup Debug</button>
+            <button class="button" onclick="openMainPage()">Abrir Página Principal</button>
+            <div id="debug-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Teste direto da função handleAgentFormSubmit</h2>
+            <button class="button" onclick="testHandleFunction()">Testar Função</button>
+            <div id="function-result" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. Instruções para Debug Manual</h2>
+            <div class="result info">
+INSTRUÇÕES PARA DEBUG MANUAL:
+
+1. Abra a página principal (index.html)
+2. Pressione F12 para abrir Developer Tools
+3. Vá para a aba Console
+4. Preencha o formulário de criação de agente
+5. Antes de clicar em "Gerar Agente SDK", digite no console:
+
+   // Ativar logs detalhados
+   window.DEBUG_MODE = true;
+   
+   // Verificar se a função existe
+   console.log('handleAgentFormSubmit exists:', typeof handleAgentFormSubmit);
+   
+   // Verificar se o formulário existe
+   console.log('Form exists:', document.getElementById('agent-form'));
+   
+   // Verificar se o event listener está ativo
+   console.log('Form has listeners:', document.getElementById('agent-form')._listeners);
+
+6. Agora clique em "Gerar Agente SDK" e observe o console
+
+Se aparecer algum erro em vermelho, copie e cole aqui para análise.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function displayResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const timestamp = new Date().toLocaleTimeString();
+                element.innerHTML = `[${timestamp}] ${message}`;
+                element.className = `result ${type}`;
+            }
+        }
+
+        function checkMainScript() {
+            displayResult('script-result', 'Verificando script principal...', 'info');
+            
+            // Tentar carregar e verificar o script principal
+            const script = document.createElement('script');
+            script.src = './script.js';
+            script.onload = () => {
+                // Verificar se as funções principais existem
+                const functions = [
+                    'handleAgentFormSubmit',
+                    'loadAgents', 
+                    'showToast',
+                    'fetchWithTimeout'
+                ];
+                
+                const results = functions.map(funcName => {
+                    const exists = typeof window[funcName] === 'function';
+                    return `${funcName}: ${exists ? '✅ OK' : '❌ MISSING'}`;
+                });
+                
+                displayResult('script-result', 
+                    `Script principal carregado!\n\n${results.join('\n')}`, 
+                    'success'
+                );
+            };
+            
+            script.onerror = () => {
+                displayResult('script-result', '❌ Erro ao carregar script.js', 'error');
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        function simulateMainForm() {
+            displayResult('form-sim-result', 'Simulando preenchimento do formulário...', 'info');
+            
+            try {
+                // Criar uma versão simplificada do formulário principal
+                const formHTML = `
+                    <form id="test-agent-form">
+                        <input type="text" name="name" value="Agente Teste Simulado" required>
+                        <select name="specialization" required>
+                            <option value="customer_service" selected>Atendimento</option>
+                        </select>
+                        <textarea name="description" required>Descrição de teste</textarea>
+                        <select name="model">
+                            <option value="anthropic/claude-3-sonnet-20240229" selected>Claude 3 Sonnet</option>
+                        </select>
+                        <textarea name="instructions" required>Instruções de teste</textarea>
+                        <button type="submit">Enviar</button>
+                    </form>
+                `;
+                
+                // Inserir formulário temporário
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = formHTML;
+                document.body.appendChild(tempDiv);
+                
+                const testForm = document.getElementById('test-agent-form');
+                
+                // Adicionar listener de teste
+                testForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(e.target);
+                    const agentData = {
+                        name: formData.get('name'),
+                        specialization: formData.get('specialization'),
+                        description: formData.get('description'),
+                        model: formData.get('model'),
+                        instructions: formData.get('instructions'),
+                        whatsapp_config: {},
+                        scheduling_config: {}
+                    };
+                    
+                    try {
+                        const response = await fetch('http://localhost:8001/api/agents', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(agentData)
+                        });
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.detail || 'Erro na requisição');
+                        }
+                        
+                        const result = await response.json();
+                        
+                        displayResult('form-sim-result', 
+                            `✅ SIMULAÇÃO FUNCIONOU!\n\n` +
+                            `Agente criado: ${result.id}\n` +
+                            `Nome: ${result.name}\n` +
+                            `Status: ${result.status}`, 
+                            'success'
+                        );
+                        
+                    } catch (error) {
+                        displayResult('form-sim-result', 
+                            `❌ SIMULAÇÃO FALHOU:\n${error.message}`, 
+                            'error'
+                        );
+                    } finally {
+                        // Remover formulário de teste
+                        document.body.removeChild(tempDiv);
+                    }
+                });
+                
+                // Submeter automaticamente
+                testForm.dispatchEvent(new Event('submit'));
+                
+            } catch (error) {
+                displayResult('form-sim-result', `❌ Erro na simulação: ${error.message}`, 'error');
+            }
+        }
+
+        function setupFormDebugging() {
+            displayResult('debug-result', 'Configurando debug...', 'info');
+            
+            // Configurar debugging global
+            window.DEBUG_MODE = true;
+            
+            // Interceptar console.log para capturar
+            const originalLog = console.log;
+            const logs = [];
+            
+            console.log = function(...args) {
+                logs.push(args.join(' '));
+                originalLog.apply(console, args);
+            };
+            
+            // Interceptar fetch para monitorar requests
+            const originalFetch = window.fetch;
+            window.fetch = function(...args) {
+                console.log('FETCH INTERCEPTED:', args[0]);
+                return originalFetch.apply(this, args)
+                    .then(response => {
+                        console.log('FETCH RESPONSE:', response.status, response.statusText);
+                        return response;
+                    })
+                    .catch(error => {
+                        console.log('FETCH ERROR:', error.message);
+                        throw error;
+                    });
+            };
+            
+            displayResult('debug-result', 
+                `✅ Debug configurado!\n\n` +
+                `- Logs detalhados ativados\n` +
+                `- Interceptação de fetch ativa\n` +
+                `- Console.log sendo capturado\n\n` +
+                `Agora abra a página principal e tente criar um agente.`, 
+                'success'
+            );
+        }
+
+        function openMainPage() {
+            window.open('./index.html', '_blank');
+        }
+
+        function testHandleFunction() {
+            displayResult('function-result', 'Testando função diretamente...', 'info');
+            
+            // Carregar script e testar função diretamente
+            const script = document.createElement('script');
+            script.src = './script.js';
+            script.onload = () => {
+                if (typeof window.handleAgentFormSubmit === 'function') {
+                    displayResult('function-result', 
+                        `✅ Função handleAgentFormSubmit encontrada!\n\n` +
+                        `Tipo: ${typeof window.handleAgentFormSubmit}\n` +
+                        `Código: ${window.handleAgentFormSubmit.toString().substring(0, 200)}...`, 
+                        'success'
+                    );
+                } else {
+                    displayResult('function-result', 
+                        `❌ Função handleAgentFormSubmit NÃO encontrada!\n\n` +
+                        `Funções disponíveis: ${Object.keys(window).filter(key => typeof window[key] === 'function').join(', ')}`, 
+                        'error'
+                    );
+                }
+            };
+            
+            script.onerror = () => {
+                displayResult('function-result', '❌ Erro ao carregar script.js', 'error');
+            };
+            
+            document.head.appendChild(script);
+        }
+
+        // Auto-executar verificação básica
+        window.addEventListener('load', () => {
+            setTimeout(checkMainScript, 1000);
+        });
+    </script>
+</body>
+</html>
