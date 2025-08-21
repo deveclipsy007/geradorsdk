@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Diagnóstico Completo - Sistema de Agentes</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1d1d1f;
+            color: #f2f2f7;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .diagnostic-section {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .test-button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        
+        .test-button:hover {
+            background: #0056b3;
+        }
+        
+        .test-result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .success { color: #30d158; }
+        .error { color: #ff453a; }
+        .warning { color: #ff9500; }
+        .info { color: #007aff; }
+        
+        .form-test {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .form-test input, .form-test select, .form-test textarea {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            padding: 8px;
+            color: #f2f2f7;
+            margin: 5px 0;
+            width: 100%;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Diagnóstico Completo do Sistema de Agentes</h1>
+    <p>Este diagnóstico verifica todos os aspectos do sistema para identificar problemas.</p>
+
+    <!-- Teste 1: Backend -->
+    <div class="diagnostic-section">
+        <h2>1. 🖥️ Backend API</h2>
+        <button class="test-button" onclick="testBackend()">Testar Backend</button>
+        <div id="backend-result" class="test-result"></div>
+    </div>
+
+    <!-- Teste 2: Frontend Form -->
+    <div class="diagnostic-section">
+        <h2>2. 📝 Formulário Frontend</h2>
+        <div class="form-test">
+            <form id="test-form">
+                <input type="text" name="name" placeholder="Nome do Agente" value="Agente Teste Diagnóstico" required><br>
+                <select name="specialization" required>
+                    <option value="customer_service">Atendimento</option>
+                    <option value="scheduling">Agendamento</option>
+                    <option value="sales">Vendas</option>
+                </select><br>
+                <textarea name="description" placeholder="Descrição" required>Este é um agente de teste para diagnóstico do sistema.</textarea><br>
+                <select name="model">
+                    <option value="anthropic/claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                    <option value="openai/gpt-4">GPT-4</option>
+                </select><br>
+                <textarea name="instructions" placeholder="Instruções" required>Seja educado e útil nas respostas. Sempre responda de forma clara e objetiva.</textarea><br>
+                <button type="submit" class="test-button">Testar Criação</button>
+            </form>
+        </div>
+        <div id="form-result" class="test-result"></div>
+    </div>
+
+    <!-- Teste 3: JavaScript -->
+    <div class="diagnostic-section">
+        <h2>3. 🔧 JavaScript e Funções</h2>
+        <button class="test-button" onclick="testJavaScript()">Testar JavaScript</button>
+        <div id="js-result" class="test-result"></div>
+    </div>
+
+    <!-- Teste 4: Elementos DOM -->
+    <div class="diagnostic-section">
+        <h2>4. 🎯 Elementos DOM</h2>
+        <button class="test-button" onclick="testDOMElements()">Verificar Elementos</button>
+        <div id="dom-result" class="test-result"></div>
+    </div>
+
+    <!-- Teste 5: Simulação Completa -->
+    <div class="diagnostic-section">
+        <h2>5. 🚀 Simulação Completa</h2>
+        <button class="test-button" onclick="runFullSimulation()">Simulação Completa</button>
+        <div id="simulation-result" class="test-result"></div>
+    </div>
+
+    <!-- Teste 6: Verificação de Agentes -->
+    <div class="diagnostic-section">
+        <h2>6. 📋 Agentes Existentes</h2>
+        <button class="test-button" onclick="checkExistingAgents()">Verificar Agentes</button>
+        <div id="agents-result" class="test-result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8001/api';
+
+        // Utilitário para exibir resultados
+        function displayResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const timestamp = new Date().toLocaleTimeString();
+                element.innerHTML = `[${timestamp}] ${message}`;
+                element.className = `test-result ${type}`;
+            }
+        }
+
+        // Teste 1: Backend
+        async function testBackend() {
+            displayResult('backend-result', 'Testando backend...', 'info');
+            
+            try {
+                // Health check
+                const healthResponse = await fetch(`${API_BASE_URL}/health`);
+                const healthData = await healthResponse.json();
+                
+                // Agents endpoint
+                const agentsResponse = await fetch(`${API_BASE_URL}/agents`);
+                const agentsData = await agentsResponse.json();
+                
+                displayResult('backend-result', 
+                    `✅ BACKEND OK!\n\n` +
+                    `Health Status: ${healthData.status}\n` +
+                    `Version: ${healthData.version}\n` +
+                    `Database: ${healthData.database}\n` +
+                    `Agents Count: ${healthData.agents_count}\n` +
+                    `Agents Endpoint: ${agentsResponse.status} (${agentsData.length} agentes)`, 
+                    'success'
+                );
+            } catch (error) {
+                displayResult('backend-result', `❌ BACKEND FALHOU:\n${error.message}`, 'error');
+            }
+        }
+
+        // Teste 2: Formulário
+        document.getElementById('test-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            displayResult('form-result', 'Testando envio do formulário...', 'info');
+            
+            try {
+                const formData = new FormData(e.target);
+                const agentData = {
+                    name: formData.get('name'),
+                    specialization: formData.get('specialization'),
+                    description: formData.get('description'),
+                    model: formData.get('model'),
+                    instructions: formData.get('instructions'),
+                    whatsapp_config: {},
+                    scheduling_config: {}
+                };
+
+                console.log('Dados coletados:', agentData);
+
+                const response = await fetch(`${API_BASE_URL}/agents`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(agentData)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`HTTP ${response.status}: ${errorData.detail || 'Erro desconhecido'}`);
+                }
+
+                const result = await response.json();
+                
+                displayResult('form-result', 
+                    `✅ FORMULÁRIO OK!\n\n` +
+                    `Agente criado: ${result.id}\n` +
+                    `Nome: ${result.name}\n` +
+                    `Status: ${result.status}\n` +
+                    `Código gerado: ${result.code ? 'SIM' : 'NÃO'}`, 
+                    'success'
+                );
+
+            } catch (error) {
+                displayResult('form-result', `❌ FORMULÁRIO FALHOU:\n${error.message}`, 'error');
+            }
+        });
+
+        // Teste 3: JavaScript
+        function testJavaScript() {
+            displayResult('js-result', 'Testando funções JavaScript...', 'info');
+            
+            try {
+                const tests = [];
+                
+                // Teste fetch
+                tests.push(`fetch disponível: ${typeof fetch !== 'undefined' ? 'SIM' : 'NÃO'}`);
+                
+                // Teste FormData
+                tests.push(`FormData disponível: ${typeof FormData !== 'undefined' ? 'SIM' : 'NÃO'}`);
+                
+                // Teste JSON
+                tests.push(`JSON disponível: ${typeof JSON !== 'undefined' ? 'SIM' : 'NÃO'}`);
+                
+                // Teste console
+                tests.push(`console disponível: ${typeof console !== 'undefined' ? 'SIM' : 'NÃO'}`);
+                
+                // Teste addEventListener
+                tests.push(`addEventListener disponível: ${typeof document.addEventListener !== 'undefined' ? 'SIM' : 'NÃO'}`);
+                
+                // Teste de async/await
+                const asyncTest = async () => { return 'OK'; };
+                tests.push(`async/await suportado: SIM`);
+
+                displayResult('js-result', `✅ JAVASCRIPT OK!\n\n${tests.join('\n')}`, 'success');
+                
+            } catch (error) {
+                displayResult('js-result', `❌ JAVASCRIPT FALHOU:\n${error.message}`, 'error');
+            }
+        }
+
+        // Teste 4: Elementos DOM
+        function testDOMElements() {
+            displayResult('dom-result', 'Verificando elementos DOM...', 'info');
+            
+            try {
+                const elementsToCheck = [
+                    'agent-form',
+                    'agent-name', 
+                    'agent-specialization',
+                    'agent-description',
+                    'agent-model',
+                    'agent-instructions',
+                    'generate-agent-btn',
+                    'loading-overlay',
+                    'generated-code'
+                ];
+                
+                const results = elementsToCheck.map(id => {
+                    const element = document.getElementById(id);
+                    return `${id}: ${element ? '✅ ENCONTRADO' : '❌ NÃO ENCONTRADO'}`;
+                });
+                
+                // Verificar se existem elementos adicionais relevantes
+                const form = document.querySelector('form[id="agent-form"]');
+                const buttons = document.querySelectorAll('button[type="submit"]');
+                
+                results.push(`\nFormulário principal: ${form ? '✅ ENCONTRADO' : '❌ NÃO ENCONTRADO'}`);
+                results.push(`Botões submit: ${buttons.length} encontrado(s)`);
+                
+                displayResult('dom-result', `VERIFICAÇÃO DOM:\n\n${results.join('\n')}`, 'info');
+                
+            } catch (error) {
+                displayResult('dom-result', `❌ DOM FALHOU:\n${error.message}`, 'error');
+            }
+        }
+
+        // Teste 5: Simulação Completa
+        async function runFullSimulation() {
+            displayResult('simulation-result', 'Executando simulação completa...', 'info');
+            
+            try {
+                const steps = [];
+                
+                // Step 1: Backend
+                steps.push('1. Testando backend...');
+                const healthResponse = await fetch(`${API_BASE_URL}/health`);
+                if (!healthResponse.ok) throw new Error('Backend não responde');
+                steps.push('   ✅ Backend OK');
+                
+                // Step 2: Criar agente
+                steps.push('2. Criando agente de teste...');
+                const agentData = {
+                    name: `Agente Diagnóstico ${Date.now()}`,
+                    specialization: 'customer_service',
+                    description: 'Agente criado automaticamente para diagnóstico',
+                    model: 'anthropic/claude-3-sonnet-20240229',
+                    instructions: 'Responda de forma educada e útil',
+                    whatsapp_config: {},
+                    scheduling_config: {}
+                };
+                
+                const createResponse = await fetch(`${API_BASE_URL}/agents`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(agentData)
+                });
+                
+                if (!createResponse.ok) {
+                    const errorData = await createResponse.json();
+                    throw new Error(`Criação falhou: ${errorData.detail}`);
+                }
+                
+                const newAgent = await createResponse.json();
+                steps.push('   ✅ Agente criado: ' + newAgent.id);
+                
+                // Step 3: Verificar se foi salvo
+                steps.push('3. Verificando se foi salvo...');
+                const checkResponse = await fetch(`${API_BASE_URL}/agents/${newAgent.id}`);
+                if (!checkResponse.ok) throw new Error('Agente não foi salvo corretamente');
+                steps.push('   ✅ Agente salvo corretamente');
+                
+                // Step 4: Listar agentes
+                steps.push('4. Verificando listagem...');
+                const listResponse = await fetch(`${API_BASE_URL}/agents`);
+                const agentsList = await listResponse.json();
+                const foundInList = agentsList.find(a => a.id === newAgent.id);
+                if (!foundInList) throw new Error('Agente não aparece na listagem');
+                steps.push('   ✅ Agente aparece na listagem');
+                
+                // Step 5: Testar chat (se disponível)
+                steps.push('5. Testando chat...');
+                try {
+                    const chatResponse = await fetch(`${API_BASE_URL}/agents/${newAgent.id}/chat`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: 'Olá, este é um teste',
+                            session_id: 'test-session'
+                        })
+                    });
+                    
+                    if (chatResponse.ok) {
+                        steps.push('   ✅ Chat funcionando');
+                    } else {
+                        steps.push('   ⚠️ Chat com problemas');
+                    }
+                } catch (chatError) {
+                    steps.push('   ⚠️ Chat não disponível');
+                }
+                
+                displayResult('simulation-result', 
+                    `✅ SIMULAÇÃO COMPLETA!\n\n${steps.join('\n')}\n\n` +
+                    `Novo agente criado:\n` +
+                    `ID: ${newAgent.id}\n` +
+                    `Nome: ${newAgent.name}\n` +
+                    `Status: ${newAgent.status}`, 
+                    'success'
+                );
+                
+            } catch (error) {
+                displayResult('simulation-result', `❌ SIMULAÇÃO FALHOU:\n${error.message}`, 'error');
+            }
+        }
+
+        // Teste 6: Agentes Existentes
+        async function checkExistingAgents() {
+            displayResult('agents-result', 'Verificando agentes existentes...', 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/agents`);
+                const agents = await response.json();
+                
+                if (agents.length === 0) {
+                    displayResult('agents-result', '⚠️ NENHUM AGENTE ENCONTRADO\n\nNão há agentes criados no sistema.', 'warning');
+                } else {
+                    const agentsList = agents.map((agent, index) => 
+                        `${index + 1}. ${agent.name} (${agent.specialization})\n   ID: ${agent.id}\n   Status: ${agent.status}`
+                    );
+                    
+                    displayResult('agents-result', 
+                        `✅ AGENTES ENCONTRADOS (${agents.length}):\n\n${agentsList.join('\n\n')}`, 
+                        'success'
+                    );
+                }
+                
+            } catch (error) {
+                displayResult('agents-result', `❌ ERRO AO VERIFICAR AGENTES:\n${error.message}`, 'error');
+            }
+        }
+
+        // Auto-executar alguns testes ao carregar
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                testBackend();
+                testJavaScript();
+                testDOMElements();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
