@@ -398,89 +398,103 @@ async def call_groq_api(messages: List[Dict], model: str) -> str:
 @app.post("/api/agents/{agent_id}/chat", response_model=ChatResponse)
 async def chat_with_agent(agent_id: str, chat: ChatRequest):
     """Envia mensagem ao agente e retorna a resposta com histórico da sessão"""
+
     try:
         from sqlalchemy import text
-        # Verificar se o agente existe e buscar suas configurações
         with get_db_session() as db:
-            result = db.execute(text("SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
+            # Verificar se o agente existe e buscar suas configurações
+            result = db.execute(
+                text(
+                    "SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"
+                ),
+                {"agent_id": agent_id},
+            )
             agent_data = result.first()
             if not agent_data:
                 raise HTTPException(status_code=404, detail="Agente não encontrado")
 
-        session_id = chat.session_id or str(uuid.uuid4())
+            session_id = chat.session_id or str(uuid.uuid4())
 
-        # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
-        with get_db_session() as db:
-            history_result = db.execute(text(
-                """
-                SELECT role, content FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
-            
+            # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
+            history_result = db.execute(
+                text(
+                    """
+                    SELECT role, content FROM chat_messages
+                    WHERE agent_id = :agent_id AND session_id = :session_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"agent_id": agent_id, "session_id": session_id},
+            )
+
             chat_history = []
             for row in history_result:
                 chat_history.append({"role": row.role, "content": row.content})
 
-        # Gerar resposta inteligente do agente usando LLM
-        agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
+            # Gerar resposta inteligente do agente usando LLM
+            agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
 
-        # Persistir mensagem do usuário
-        with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": chat.user_id,
-                "role": "user",
-                "content": chat.message,
-            })
+            # Persistir mensagens do usuário e do agente em uma transação
+            with db.begin():
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
+                        VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "user_id": chat.user_id,
+                        "role": "user",
+                        "content": chat.message,
+                    },
+                )
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
+                        VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "user_id": None,
+                        "role": "assistant",
+                        "content": agent_reply,
+                    },
+                )
 
-        # Persistir resposta do agente
-        with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": None,
-                "role": "assistant",
-                "content": agent_reply,
-            })
-
-        # Buscar histórico da sessão
-        with get_db_session() as db:
-            res = db.execute(text(
-                """
-                SELECT id, agent_id, session_id, user_id, role, content, created_at
-                FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
+            # Buscar histórico da sessão
+            res = db.execute(
+                text(
+                    """
+                    SELECT id, agent_id, session_id, user_id, role, content, created_at
+                    FROM chat_messages
+                    WHERE agent_id = :agent_id AND session_id = :session_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"agent_id": agent_id, "session_id": session_id},
+            )
 
             messages = []
             for r in res:
-                messages.append(ChatMessageModel(
-                    id=r.id,
-                    agent_id=r.agent_id,
-                    session_id=r.session_id,
-                    user_id=r.user_id,
-                    role=r.role,
-                    content=r.content,
-                    created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None)
-                ))
-
+                messages.append(
+                    ChatMessageModel(
+                        id=r.id,
+                        agent_id=r.agent_id,
+                        session_id=r.session_id,
+                        user_id=r.user_id,
+                        role=r.role,
+                        content=r.content,
+                        created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None),
+                    )
+                )
         logger.info(f"chat_message agent_id={agent_id} session_id={session_id} len={len(messages)}")
 
         return ChatResponse(
