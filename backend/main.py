@@ -5,12 +5,14 @@ from typing import List, Dict, Any, Optional
 import uuid
 import json
 import os
+import re
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 import logging
 from decimal import Decimal
 import httpx
 import asyncio
+from jinja2 import Environment, BaseLoader
 
 # Imports dos módulos
 from config import config
@@ -63,9 +65,21 @@ class ChatResponse(BaseModel):
     reply: str
     messages: List[ChatMessageModel]
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
+# Configurar logging utilizando configurações dinâmicas
+log_config = {
+    "level": getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
+}
+if config.LOG_FILE:
+    log_config["filename"] = config.LOG_FILE
+logging.basicConfig(**log_config)
 logger = logging.getLogger(__name__)
+
+def sanitize_input(value: str) -> str:
+    """Remove caracteres potencialmente perigosos de uma entrada."""
+    if not isinstance(value, str):
+        return value
+    value = value.replace("\n", " ").replace("\r", " ")
+    return re.sub(r'[\"\'`;<>{}()\\]', '', value)
 
 # Lifespan events
 @asynccontextmanager
@@ -73,10 +87,17 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("[INICIO] Iniciando SDK Agentes Especializados...")
     
+    # Initialize database explicitly on startup
     if not init_database():
         logger.error("Falha na inicialização do banco de dados")
         raise RuntimeError("Database initialization failed")
-    
+
+    # Validar chaves de API configuradas
+    api_keys_status = config.validate_api_keys()
+    missing_keys = [k for k, v in api_keys_status.items() if not v]
+    if missing_keys:
+        logger.warning(f"Chaves de API ausentes: {', '.join(missing_keys)}")
+
     logger.info("[OK] Sistema SDK iniciado com sucesso!")
     
     yield
@@ -94,10 +115,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    **config.get_cors_config(),
 )
 
 # Health check endpoint
@@ -288,6 +306,9 @@ Responda de forma natural, útil e consistente com sua especialização. Mantenh
 
 async def call_anthropic_api(messages: List[Dict], model: str) -> str:
     """Chama a API da Anthropic/Claude"""
+    if not config.ANTHROPIC_API_KEY:
+        logger.error("ANTHROPIC_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY não configurada")
     try:
         # Separar system message das outras mensagens
         system_message = ""
@@ -324,6 +345,9 @@ async def call_anthropic_api(messages: List[Dict], model: str) -> str:
 
 async def call_openai_api(messages: List[Dict], model: str) -> str:
     """Chama a API da OpenAI"""
+    if not config.OPENAI_API_KEY:
+        logger.error("OPENAI_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY não configurada")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -349,6 +373,9 @@ async def call_openai_api(messages: List[Dict], model: str) -> str:
 
 async def call_groq_api(messages: List[Dict], model: str) -> str:
     """Chama a API do Groq"""
+    if not config.GROQ_API_KEY:
+        logger.error("GROQ_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY não configurada")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -380,89 +407,103 @@ async def call_groq_api(messages: List[Dict], model: str) -> str:
 @app.post("/api/agents/{agent_id}/chat", response_model=ChatResponse)
 async def chat_with_agent(agent_id: str, chat: ChatRequest):
     """Envia mensagem ao agente e retorna a resposta com histórico da sessão"""
+
     try:
         from sqlalchemy import text
-        # Verificar se o agente existe e buscar suas configurações
         with get_db_session() as db:
-            result = db.execute(text("SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
+            # Verificar se o agente existe e buscar suas configurações
+            result = db.execute(
+                text(
+                    "SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"
+                ),
+                {"agent_id": agent_id},
+            )
             agent_data = result.first()
             if not agent_data:
                 raise HTTPException(status_code=404, detail="Agente não encontrado")
 
-        session_id = chat.session_id or str(uuid.uuid4())
+            session_id = chat.session_id or str(uuid.uuid4())
 
-        # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
-        with get_db_session() as db:
-            history_result = db.execute(text(
-                """
-                SELECT role, content FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
-            
+            # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
+            history_result = db.execute(
+                text(
+                    """
+                    SELECT role, content FROM chat_messages
+                    WHERE agent_id = :agent_id AND session_id = :session_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"agent_id": agent_id, "session_id": session_id},
+            )
+
             chat_history = []
             for row in history_result:
                 chat_history.append({"role": row.role, "content": row.content})
 
-        # Gerar resposta inteligente do agente usando LLM
-        agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
+            # Gerar resposta inteligente do agente usando LLM
+            agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
 
-        # Persistir mensagem do usuário
-        with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": chat.user_id,
-                "role": "user",
-                "content": chat.message,
-            })
+            # Persistir mensagens do usuário e do agente em uma transação
+            with db.begin():
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
+                        VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "user_id": chat.user_id,
+                        "role": "user",
+                        "content": chat.message,
+                    },
+                )
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
+                        VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "user_id": None,
+                        "role": "assistant",
+                        "content": agent_reply,
+                    },
+                )
 
-        # Persistir resposta do agente
-        with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": None,
-                "role": "assistant",
-                "content": agent_reply,
-            })
-
-        # Buscar histórico da sessão
-        with get_db_session() as db:
-            res = db.execute(text(
-                """
-                SELECT id, agent_id, session_id, user_id, role, content, created_at
-                FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
+            # Buscar histórico da sessão
+            res = db.execute(
+                text(
+                    """
+                    SELECT id, agent_id, session_id, user_id, role, content, created_at
+                    FROM chat_messages
+                    WHERE agent_id = :agent_id AND session_id = :session_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"agent_id": agent_id, "session_id": session_id},
+            )
 
             messages = []
             for r in res:
-                messages.append(ChatMessageModel(
-                    id=r.id,
-                    agent_id=r.agent_id,
-                    session_id=r.session_id,
-                    user_id=r.user_id,
-                    role=r.role,
-                    content=r.content,
-                    created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None)
-                ))
-
+                messages.append(
+                    ChatMessageModel(
+                        id=r.id,
+                        agent_id=r.agent_id,
+                        session_id=r.session_id,
+                        user_id=r.user_id,
+                        role=r.role,
+                        content=r.content,
+                        created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None),
+                    )
+                )
         logger.info(f"chat_message agent_id={agent_id} session_id={session_id} len={len(messages)}")
 
         return ChatResponse(
@@ -1235,9 +1276,13 @@ async def get_logs(level: Optional[str] = None, agent_id: Optional[str] = None, 
         logger.error(f"Erro ao ler logs: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao ler logs: {str(e)}")
 
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host=config.HOST, port=config.PORT, reload=config.DEBUG)
+
 def generate_sdk_agent_code(agent_request: SDKAgentRequest) -> str:
     """Gera código Python para o agente SDK especializado"""
-    
     specialization_templates = {
         "customer_service": """
 # AGENTE SDK - ATENDIMENTO AO CLIENTE
@@ -1246,20 +1291,20 @@ def generate_sdk_agent_code(agent_request: SDKAgentRequest) -> str:
 
 class CustomerServiceAgent:
     def __init__(self):
-        self.name = "{name}"
+        self.name = {{ name|tojson }}
         self.specialization = "Atendimento ao Cliente"
-        self.model = "{model}"
-        self.whatsapp_config = {whatsapp_config}
-        
+        self.model = {{ model|tojson }}
+        self.whatsapp_config = {{ whatsapp_config|tojson(indent=2) }}
+
     def process_customer_message(self, message, customer_data):
-        \"\"\"Processa mensagens de atendimento\"\"\"
-        
+        '''Processa mensagens de atendimento'''
+
         # Instruções específicas:
-        # {instructions}
-        
+        # {{ instructions|e }}
+
         # Análise de intenção
         intent = self.analyze_intent(message)
-        
+
         if intent == "complaint":
             return self.handle_complaint(message, customer_data)
         elif intent == "support":
@@ -1268,42 +1313,42 @@ class CustomerServiceAgent:
             return self.provide_information(message)
         else:
             return self.default_response(message)
-    
+
     def analyze_intent(self, message):
         # Implementar análise de intenção
         return "support"
-    
+
     def handle_complaint(self, message, customer_data):
         return f"Entendo sua preocupação. Vou registrar sua reclamação e nossa equipe entrará em contato."
-    
+
     def provide_support(self, message, customer_data):
         return f"Como posso ajudá-lo hoje? Estou aqui para resolver sua questão."
-    
+
     def provide_information(self, message):
         return f"Aqui estão as informações solicitadas..."
-        
+
     def default_response(self, message):
         return f"Obrigado por entrar em contato. Como posso ajudá-lo?"
 """,
         "scheduling": """
-# 📅 AGENTE SDK - AGENDAMENTO DE SERVIÇOS  
+# 📅 AGENTE SDK - AGENDAMENTO DE SERVIÇOS
 # Especializado em gestão de agendamentos
 
 class SchedulingAgent:
     def __init__(self):
-        self.name = "{name}"
+        self.name = {{ name|tojson }}
         self.specialization = "Agendamento de Serviços"
-        self.model = "{model}"
-        self.scheduling_config = {scheduling_config}
-        
+        self.model = {{ model|tojson }}
+        self.scheduling_config = {{ scheduling_config|tojson(indent=2) }}
+
     def process_scheduling_request(self, message, customer_data):
-        \"\"\"Processa solicitações de agendamento\"\"\"
-        
+        '''Processa solicitações de agendamento'''
+
         # Instruções específicas:
-        # {instructions}
-        
+        # {{ instructions|e }}
+
         intent = self.analyze_scheduling_intent(message)
-        
+
         if intent == "new_appointment":
             return self.create_appointment(message, customer_data)
         elif intent == "reschedule":
@@ -1314,24 +1359,24 @@ class SchedulingAgent:
             return self.check_availability(message)
         else:
             return self.collect_appointment_info(message)
-    
+
     def analyze_scheduling_intent(self, message):
         # Implementar análise de intenção de agendamento
         return "new_appointment"
-    
+
     def create_appointment(self, message, customer_data):
         # Coletar: nome, telefone, serviço, data/hora preferida
         return f"Vou agendar seu serviço. Preciso de algumas informações: nome completo, telefone e horário preferido."
-    
+
     def reschedule_appointment(self, message, customer_data):
         return f"Vou ajudar você a reagendar. Qual seria o novo horário de sua preferência?"
-    
+
     def cancel_appointment(self, message, customer_data):
         return f"Posso cancelar seu agendamento. Poderia confirmar os dados?"
-    
+
     def check_availability(self, message):
         return f"Verificando disponibilidade... Temos horários disponíveis em..."
-    
+
     def collect_appointment_info(self, message):
         return f"Para confirmar seu agendamento, preciso das seguintes informações..."
 """,
@@ -1341,19 +1386,19 @@ class SchedulingAgent:
 
 class SalesAgent:
     def __init__(self):
-        self.name = "{name}"
+        self.name = {{ name|tojson }}
         self.specialization = "Processo de Vendas"
-        self.model = "{model}"
-        self.sales_config = {{"leads_system": "active"}}
-        
+        self.model = {{ model|tojson }}
+        self.sales_config = {"leads_system": "active"}
+
     def process_sales_interaction(self, message, lead_data):
-        \"\"\"Processa interações de vendas\"\"\"
-        
+        '''Processa interações de vendas'''
+
         # Instruções específicas:
-        # {instructions}
-        
+        # {{ instructions|e }}
+
         stage = self.identify_sales_stage(message, lead_data)
-        
+
         if stage == "awareness":
             return self.create_awareness(message, lead_data)
         elif stage == "interest":
@@ -1364,41 +1409,44 @@ class SalesAgent:
             return self.close_sale(message, lead_data)
         else:
             return self.qualify_lead(message)
-    
+
     def identify_sales_stage(self, message, lead_data):
         # Implementar identificação de estágio de vendas
         return "interest"
-    
+
     def create_awareness(self, message, lead_data):
         return f"Conheça nossas soluções que podem revolucionar seu negócio..."
-    
+
     def generate_interest(self, message, lead_data):
         return f"Vou mostrar como nossos serviços podem beneficiar especificamente seu caso..."
-    
+
     def facilitate_consideration(self, message, lead_data):
         return f"Que tal agendar uma demonstração personalizada? Posso mostrar resultados reais..."
-    
+
     def close_sale(self, message, lead_data):
         return f"Excelente! Vou preparar uma proposta personalizada para você..."
-    
+
     def qualify_lead(self, message):
         return f"Para oferecer a melhor solução, preciso entender melhor suas necessidades..."
-    
+
     def follow_up_lead(self, lead_data):
         return f"Continuando nossa conversa sobre como podemos ajudar seu negócio..."
-"""
+""",
     }
-    
-    template = specialization_templates.get(agent_request.specialization, specialization_templates["customer_service"])
-    
-    return template.format(
-        name=agent_request.name,
-        model=agent_request.model,
-        instructions=agent_request.instructions,
-        whatsapp_config=json.dumps(agent_request.whatsapp_config, indent=2),
-        scheduling_config=json.dumps(agent_request.scheduling_config, indent=2)
-    )
 
+    template_str = specialization_templates.get(
+        agent_request.specialization, specialization_templates["customer_service"]
+    )
+    env = Environment(loader=BaseLoader(), autoescape=True)
+    template = env.from_string(template_str)
+    return template.render(
+        name=sanitize_input(agent_request.name),
+        model=sanitize_input(agent_request.model),
+        instructions=sanitize_input(agent_request.instructions),
+        whatsapp_config=agent_request.whatsapp_config,
+        scheduling_config=agent_request.scheduling_config,
+    )
+=======
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host=config.HOST, port=config.PORT, reload=config.DEBUG)

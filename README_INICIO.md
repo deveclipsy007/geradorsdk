@@ -3,7 +3,7 @@
 ## ✅ Problemas Resolvidos
 
 - **SyntaxError corrigido**: Arquivo `frontend/script.js` reescrito com sintaxe JavaScript válida
-- **Conectividade backend-frontend**: Portas alinhadas (8001)
+- **Conectividade backend-frontend**: Portas alinhadas (8000)
 - **Endpoint de saúde**: `/api/health` implementado e funcionando
 - **Chat 404 Error resolvido**: Endpoint `/api/agents/{id}/chat` implementado com resposta simulada
 
@@ -21,7 +21,7 @@ cd backend
 python main.py
 ```
 
-**O backend irá iniciar em:** `http://localhost:8001`
+**O backend irá iniciar em:** `http://localhost:8000`
 
 ### 2. **Iniciar o Frontend**
 
@@ -38,15 +38,15 @@ python -m http.server 8080 --directory frontend
 
 ## 🔧 Configurações
 
-### Backend (Porta 8001)
+### Backend (Porta 8000)
 - Configuração: `backend/config.py` e `.env`
-- API Base: `http://localhost:8001/api`
-- Health Check: `http://localhost:8001/api/health`
+- API Base: `http://localhost:8000/api`
+- Health Check: `http://localhost:8000/api/health`
 
 ### Frontend (Porta 8080)
 - Arquivo principal: `frontend/index.html`
 - Script: `frontend/script.js`
-- API calls apontam para: `http://localhost:8001/api`
+- API calls apontam para: `http://localhost:8000/api`
 
 ## 🎪 Funcionalidades Testadas
 
@@ -67,7 +67,7 @@ python -m http.server 8080 --directory frontend
 
 O sistema agora está **100% operacional** com:
 
-- **Backend**: Respondendo corretamente na porta 8001
+- **Backend**: Respondendo corretamente na porta 8000
 - **Frontend**: Interface funcionando sem erros JavaScript
 - **API**: Endpoints de saúde e agentes operacionais
 - **Database**: SQLite inicializado e funcionando
@@ -76,12 +76,12 @@ O sistema agora está **100% operacional** com:
 
 Se ainda encontrar problemas:
 
-1. **Verifique se as portas estão livres**: 8001 (backend) e 8080 (frontend)
+1. **Verifique se as portas estão livres**: 8000 (backend) e 8080 (frontend)
 2. **Confirme as dependências**: `pip install -r requirements.txt`
 3. **Verifique logs**: O backend mostra logs detalhados no terminal
 4. **Teste endpoints diretos**: 
-   - `curl http://localhost:8001/api/health`
-   - `curl http://localhost:8001/api/agents`
+   - `curl http://localhost:8000/api/health`
+   - `curl http://localhost:8000/api/agents`
 
 ---
 

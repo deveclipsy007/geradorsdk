@@ -221,7 +221,7 @@ python -c "from backend.database import DatabaseManager; DatabaseManager.reset_d
 
 ```bash
 # Mude a porta no .env
-PORT=8001
+PORT=8000  # altere para uma porta livre se necessário
 
 # Ou mate o processo na porta
 # Windows:
