@@ -520,7 +520,7 @@ Veja o arquivo [LICENSE](LICENSE) para detalhes completos.
 
 | Problema | Solução |
 |----------|---------|
-| **Porta em uso** | Altere `PORT=8001` no `.env` |
+| **Porta em uso** | Altere `PORT` no `.env` para uma porta livre |
 | **API Key inválida** | Verifique configuração no `.env` |
 | **Banco não conecta** | Verifique `DATABASE_URL` |
 | **Módulo não encontrado** | Ative ambiente virtual |
