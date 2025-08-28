@@ -5,17 +5,24 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+=======
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
+from jose import JWTError, jwt
 import uuid
 import json
 import os
+import re
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 import logging
 from decimal import Decimal
 import httpx
 import asyncio
+from jinja2 import Environment, BaseLoader
 
 # Imports dos módulos
 from config import config
@@ -68,8 +75,76 @@ class ChatResponse(BaseModel):
     reply: str
     messages: List[ChatMessageModel]
 
+
+# Security models
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: str
+    role: str
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+SECRET_KEY = config.SECRET_KEY
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Simple user store for demonstration
+fake_users_db = {
+    "admin": {"username": "admin", "password": "admin", "role": "admin"},
+    "user": {"username": "user", "password": "user", "role": "user"},
+}
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def authenticate_user(username: str, password: str):
+    user = fake_users_db.get(username)
+    if not user or user["password"] != password:
+        return None
+    return user
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        role: str = payload.get("role")
+        if username is None or role is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    return TokenData(username=username, role=role)
+
+
+def admin_required(current_user: TokenData = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    return current_user
+
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
+
+# Configurar logging utilizando configurações dinâmicas
+log_config = {
+    "level": getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
+}
+if config.LOG_FILE:
+    log_config["filename"] = config.LOG_FILE
+logging.basicConfig(**log_config)
 logger = logging.getLogger(__name__)
 
 # Métricas Prometheus
@@ -82,6 +157,13 @@ RATE_LIMIT_EXCEEDED = Counter(
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address, default_limits=[config.RATE_LIMIT])
+=======
+def sanitize_input(value: str) -> str:
+    """Remove caracteres potencialmente perigosos de uma entrada."""
+    if not isinstance(value, str):
+        return value
+    value = value.replace("\n", " ").replace("\r", " ")
+    return re.sub(r'[\"\'`;<>{}()\\]', '', value)
 
 # Lifespan events
 @asynccontextmanager
@@ -89,10 +171,17 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("[INICIO] Iniciando SDK Agentes Especializados...")
     
+    # Initialize database explicitly on startup
     if not init_database():
         logger.error("Falha na inicialização do banco de dados")
         raise RuntimeError("Database initialization failed")
-    
+
+    # Validar chaves de API configuradas
+    api_keys_status = config.validate_api_keys()
+    missing_keys = [k for k, v in api_keys_status.items() if not v]
+    if missing_keys:
+        logger.warning(f"Chaves de API ausentes: {', '.join(missing_keys)}")
+
     logger.info("[OK] Sistema SDK iniciado com sucesso!")
     
     yield
@@ -132,10 +221,7 @@ async def metrics():
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    **config.get_cors_config(),
 )
 
 # Health check endpoint
@@ -163,9 +249,22 @@ async def health_check():
         logger.error(f"Health check failed: {str(e)}")
         raise HTTPException(status_code=500, detail="System unhealthy")
 
+# OAuth2 token endpoint
+@app.post("/token", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["username"], "role": user["role"]},
+        expires_delta=access_token_expires,
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 # Create SDK Agent
 @app.post("/api/agents", response_model=SDKAgentResponse)
-async def create_sdk_agent(agent_request: SDKAgentRequest):
+async def create_sdk_agent(agent_request: SDKAgentRequest, _: TokenData = Depends(admin_required)):
     """Cria um novo agente SDK especializado"""
     try:
         logger.info(f"Criando agente SDK: {agent_request.name} ({agent_request.specialization})")
@@ -210,7 +309,7 @@ async def create_sdk_agent(agent_request: SDKAgentRequest):
 
 # List SDK Agents
 @app.get("/api/agents")
-async def list_sdk_agents():
+async def list_sdk_agents(_: TokenData = Depends(admin_required)):
     """Lista todos os agentes SDK criados"""
     try:
         from sqlalchemy import text
@@ -240,7 +339,7 @@ async def list_sdk_agents():
 
 # Get SDK Agent by ID
 @app.get("/api/agents/{agent_id}")
-async def get_sdk_agent(agent_id: str):
+async def get_sdk_agent(agent_id: str, _: TokenData = Depends(admin_required)):
     """Obtém detalhes de um agente SDK específico"""
     try:
         from sqlalchemy import text
@@ -327,6 +426,9 @@ Responda de forma natural, útil e consistente com sua especialização. Mantenh
 
 async def call_anthropic_api(messages: List[Dict], model: str) -> str:
     """Chama a API da Anthropic/Claude"""
+    if not config.ANTHROPIC_API_KEY:
+        logger.error("ANTHROPIC_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY não configurada")
     try:
         # Separar system message das outras mensagens
         system_message = ""
@@ -363,6 +465,9 @@ async def call_anthropic_api(messages: List[Dict], model: str) -> str:
 
 async def call_openai_api(messages: List[Dict], model: str) -> str:
     """Chama a API da OpenAI"""
+    if not config.OPENAI_API_KEY:
+        logger.error("OPENAI_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY não configurada")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -388,6 +493,9 @@ async def call_openai_api(messages: List[Dict], model: str) -> str:
 
 async def call_groq_api(messages: List[Dict], model: str) -> str:
     """Chama a API do Groq"""
+    if not config.GROQ_API_KEY:
+        logger.error("GROQ_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY não configurada")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -417,91 +525,105 @@ async def call_groq_api(messages: List[Dict], model: str) -> str:
 
 
 @app.post("/api/agents/{agent_id}/chat", response_model=ChatResponse)
-async def chat_with_agent(agent_id: str, chat: ChatRequest):
+async def chat_with_agent(agent_id: str, chat: ChatRequest, _: TokenData = Depends(get_current_user)):
     """Envia mensagem ao agente e retorna a resposta com histórico da sessão"""
+
     try:
         from sqlalchemy import text
-        # Verificar se o agente existe e buscar suas configurações
         with get_db_session() as db:
-            result = db.execute(text("SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
+            # Verificar se o agente existe e buscar suas configurações
+            result = db.execute(
+                text(
+                    "SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"
+                ),
+                {"agent_id": agent_id},
+            )
             agent_data = result.first()
             if not agent_data:
                 raise HTTPException(status_code=404, detail="Agente não encontrado")
 
-        session_id = chat.session_id or str(uuid.uuid4())
+            session_id = chat.session_id or str(uuid.uuid4())
 
-        # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
-        with get_db_session() as db:
-            history_result = db.execute(text(
-                """
-                SELECT role, content FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
-            
+            # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
+            history_result = db.execute(
+                text(
+                    """
+                    SELECT role, content FROM chat_messages
+                    WHERE agent_id = :agent_id AND session_id = :session_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"agent_id": agent_id, "session_id": session_id},
+            )
+
             chat_history = []
             for row in history_result:
                 chat_history.append({"role": row.role, "content": row.content})
 
-        # Gerar resposta inteligente do agente usando LLM
-        agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
+            # Gerar resposta inteligente do agente usando LLM
+            agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
 
-        # Persistir mensagem do usuário
-        with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": chat.user_id,
-                "role": "user",
-                "content": chat.message,
-            })
+            # Persistir mensagens do usuário e do agente em uma transação
+            with db.begin():
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
+                        VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "user_id": chat.user_id,
+                        "role": "user",
+                        "content": chat.message,
+                    },
+                )
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
+                        VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "user_id": None,
+                        "role": "assistant",
+                        "content": agent_reply,
+                    },
+                )
 
-        # Persistir resposta do agente
-        with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": None,
-                "role": "assistant",
-                "content": agent_reply,
-            })
-
-        # Buscar histórico da sessão
-        with get_db_session() as db:
-            res = db.execute(text(
-                """
-                SELECT id, agent_id, session_id, user_id, role, content, created_at
-                FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
+            # Buscar histórico da sessão
+            res = db.execute(
+                text(
+                    """
+                    SELECT id, agent_id, session_id, user_id, role, content, created_at
+                    FROM chat_messages
+                    WHERE agent_id = :agent_id AND session_id = :session_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"agent_id": agent_id, "session_id": session_id},
+            )
 
             messages = []
             for r in res:
-                messages.append(ChatMessageModel(
-                    id=r.id,
-                    agent_id=r.agent_id,
-                    session_id=r.session_id,
-                    user_id=r.user_id,
-                    role=r.role,
-                    content=r.content,
-                    created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None)
-                ))
-
+                messages.append(
+                    ChatMessageModel(
+                        id=r.id,
+                        agent_id=r.agent_id,
+                        session_id=r.session_id,
+                        user_id=r.user_id,
+                        role=r.role,
+                        content=r.content,
+                        created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None),
+                    )
+                )
         logger.info(f"chat_message agent_id={agent_id} session_id={session_id} len={len(messages)}")
 
         return ChatResponse(
@@ -519,7 +641,7 @@ async def chat_with_agent(agent_id: str, chat: ChatRequest):
 
 
 @app.get("/api/agents/{agent_id}/history", response_model=List[ChatMessageModel])
-async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limit: int = 100):
+async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limit: int = 100, _: TokenData = Depends(admin_required)):
     """Retorna histórico de chat do agente. Se session_id for omitido, retorna últimas mensagens do agente."""
     try:
         from sqlalchemy import text
@@ -559,7 +681,7 @@ async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limi
 
 # Delete SDK Agent
 @app.delete("/api/agents/{agent_id}")
-async def delete_sdk_agent(agent_id: str):
+async def delete_sdk_agent(agent_id: str, _: TokenData = Depends(admin_required)):
     """Exclui um agente SDK"""
     try:
         from sqlalchemy import text
@@ -581,7 +703,7 @@ async def delete_sdk_agent(agent_id: str):
 
 # System statistics
 @app.get("/api/stats")
-async def get_system_stats():
+async def get_system_stats(_: TokenData = Depends(admin_required)):
     """Obtém estatísticas do sistema SDK"""
     try:
         from sqlalchemy import text
@@ -658,7 +780,7 @@ calendar_service = None
 email_manager = None
 
 @app.post("/api/integrations/{integration_name}/test")
-async def test_integration(integration_name: str, config: Dict[str, Any]):
+async def test_integration(integration_name: str, config: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Testa uma integração específica"""
     try:
         logger.info(f"Testando integração: {integration_name}")
@@ -685,7 +807,7 @@ async def test_integration(integration_name: str, config: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=f"Erro no teste: {str(e)}")
 
 @app.post("/api/integrations/{integration_name}/config")
-async def save_integration_config(integration_name: str, config: IntegrationConfig):
+async def save_integration_config(integration_name: str, config: IntegrationConfig, _: TokenData = Depends(admin_required)):
     """Salva configuração de uma integração"""
     try:
         logger.info(f"Salvando configuração para integração: {integration_name}")
@@ -705,7 +827,7 @@ async def save_integration_config(integration_name: str, config: IntegrationConf
         raise HTTPException(status_code=500, detail=f"Erro ao salvar configuração: {str(e)}")
 
 @app.get("/api/integrations")
-async def list_integrations():
+async def list_integrations(_: TokenData = Depends(admin_required)):
     """Lista todas as integrações disponíveis e seus status"""
     try:
         integrations = [
@@ -841,7 +963,7 @@ async def simulate_integration_test(integration_name: str, config: Dict[str, Any
 
 # Payment Integration Endpoints
 @app.post("/api/payments/create-link")
-async def create_payment_link(payment_request: PaymentLinkRequest):
+async def create_payment_link(payment_request: PaymentLinkRequest, _: TokenData = Depends(admin_required)):
     """Cria link de pagamento usando Stripe ou Asaas"""
     try:
         # Initialize payment manager if not already done
@@ -878,7 +1000,7 @@ async def create_payment_link(payment_request: PaymentLinkRequest):
         raise HTTPException(status_code=500, detail=f"Erro ao criar link de pagamento: {str(e)}")
 
 @app.get("/api/payments/{provider}/{payment_id}/status")
-async def get_payment_status(provider: str, payment_id: str):
+async def get_payment_status(provider: str, payment_id: str, _: TokenData = Depends(admin_required)):
     """Obtém status de pagamento"""
     try:
         global payment_manager
@@ -894,7 +1016,7 @@ async def get_payment_status(provider: str, payment_id: str):
 
 # WhatsApp Evolution API Endpoints
 @app.post("/api/whatsapp/create-instance")
-async def create_whatsapp_instance(instance_request: WhatsAppInstanceRequest):
+async def create_whatsapp_instance(instance_request: WhatsAppInstanceRequest, _: TokenData = Depends(admin_required)):
     """Cria instância WhatsApp via Evolution API"""
     try:
         global evolution_service
@@ -915,7 +1037,7 @@ async def create_whatsapp_instance(instance_request: WhatsAppInstanceRequest):
         raise HTTPException(status_code=500, detail=f"Erro ao criar instância: {str(e)}")
 
 @app.get("/api/whatsapp/{instance_name}/qr-code")
-async def get_whatsapp_qr_code(instance_name: str):
+async def get_whatsapp_qr_code(instance_name: str, _: TokenData = Depends(admin_required)):
     """Obtém QR Code para conexão WhatsApp"""
     try:
         global evolution_service
@@ -930,7 +1052,7 @@ async def get_whatsapp_qr_code(instance_name: str):
         raise HTTPException(status_code=500, detail=f"Erro ao obter QR Code: {str(e)}")
 
 @app.get("/api/whatsapp/{instance_name}/status")
-async def get_whatsapp_instance_status(instance_name: str):
+async def get_whatsapp_instance_status(instance_name: str, _: TokenData = Depends(admin_required)):
     """Obtém status da instância WhatsApp"""
     try:
         global evolution_service
@@ -945,7 +1067,7 @@ async def get_whatsapp_instance_status(instance_name: str):
         raise HTTPException(status_code=500, detail=f"Erro ao obter status: {str(e)}")
 
 @app.post("/api/whatsapp/{instance_name}/send-message")
-async def send_whatsapp_message(instance_name: str, message_data: Dict[str, Any]):
+async def send_whatsapp_message(instance_name: str, message_data: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Envia mensagem via WhatsApp"""
     try:
         global evolution_service
@@ -966,7 +1088,7 @@ async def send_whatsapp_message(instance_name: str, message_data: Dict[str, Any]
         raise HTTPException(status_code=500, detail=f"Erro ao enviar mensagem: {str(e)}")
 
 @app.post("/api/whatsapp/{instance_name}/send-payment-link")
-async def send_whatsapp_payment_link(instance_name: str, payment_data: Dict[str, Any]):
+async def send_whatsapp_payment_link(instance_name: str, payment_data: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Envia link de pagamento via WhatsApp"""
     try:
         global evolution_service
@@ -986,7 +1108,7 @@ async def send_whatsapp_payment_link(instance_name: str, payment_data: Dict[str,
         raise HTTPException(status_code=500, detail=f"Erro ao enviar link de pagamento: {str(e)}")
 
 @app.delete("/api/whatsapp/{instance_name}")
-async def delete_whatsapp_instance(instance_name: str):
+async def delete_whatsapp_instance(instance_name: str, _: TokenData = Depends(admin_required)):
     """Deleta instância WhatsApp"""
     try:
         global evolution_service
@@ -1001,7 +1123,7 @@ async def delete_whatsapp_instance(instance_name: str):
         raise HTTPException(status_code=500, detail=f"Erro ao deletar instância: {str(e)}")
 
 @app.get("/api/whatsapp/instances")
-async def list_whatsapp_instances():
+async def list_whatsapp_instances(_: TokenData = Depends(admin_required)):
     """Lista todas as instâncias WhatsApp"""
     try:
         global evolution_service
@@ -1017,7 +1139,7 @@ async def list_whatsapp_instances():
 
 # Google Calendar Endpoints
 @app.post("/api/calendar/events")
-async def create_calendar_event(event_request: CalendarEventRequest):
+async def create_calendar_event(event_request: CalendarEventRequest, _: TokenData = Depends(admin_required)):
     """Cria evento no Google Calendar"""
     try:
         global calendar_service
@@ -1048,7 +1170,8 @@ async def create_calendar_event(event_request: CalendarEventRequest):
 async def get_calendar_events(
     start_date: str = None,
     end_date: str = None,
-    calendar_id: str = 'primary'
+    calendar_id: str = 'primary',
+    _: TokenData = Depends(admin_required)
 ):
     """Obtém eventos do Google Calendar"""
     try:
@@ -1077,7 +1200,7 @@ async def get_calendar_events(
         raise HTTPException(status_code=500, detail=f"Erro ao obter eventos: {str(e)}")
 
 @app.post("/api/calendar/check-availability")
-async def check_calendar_availability(availability_data: Dict[str, Any]):
+async def check_calendar_availability(availability_data: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Verifica disponibilidade no calendário"""
     try:
         global calendar_service
@@ -1104,7 +1227,8 @@ async def find_available_calendar_slots(
     date: str,
     duration_minutes: int = 60,
     start_hour: str = "09:00",
-    end_hour: str = "17:00"
+    end_hour: str = "17:00",
+    _: TokenData = Depends(admin_required)
 ):
     """Encontra horários disponíveis no calendário"""
     try:
@@ -1129,7 +1253,7 @@ async def find_available_calendar_slots(
 
 # Email Integration Endpoints
 @app.post("/api/email/send")
-async def send_email(email_request: EmailRequest):
+async def send_email(email_request: EmailRequest, _: TokenData = Depends(admin_required)):
     """Envia email via SendGrid ou SMTP"""
     try:
         global email_manager
@@ -1163,7 +1287,7 @@ async def send_email(email_request: EmailRequest):
         raise HTTPException(status_code=500, detail=f"Erro ao enviar email: {str(e)}")
 
 @app.post("/api/email/send-appointment-confirmation")
-async def send_appointment_confirmation_email(notification_data: Dict[str, Any]):
+async def send_appointment_confirmation_email(notification_data: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Envia confirmação de agendamento por email"""
     try:
         global email_manager
@@ -1185,7 +1309,7 @@ async def send_appointment_confirmation_email(notification_data: Dict[str, Any])
 
 # Integration status endpoint
 @app.get("/api/integrations/status")
-async def get_integrations_status():
+async def get_integrations_status(_: TokenData = Depends(admin_required)):
     """Obtém status de todas as integrações"""
     try:
         status = {
@@ -1220,7 +1344,7 @@ async def get_integrations_status():
 
 @app.get("/api/logs")
 async def get_logs(level: Optional[str] = None, agent_id: Optional[str] = None, session_id: Optional[str] = None,
-                   since: Optional[str] = None, limit: int = 200):
+                   since: Optional[str] = None, limit: int = 200, _: TokenData = Depends(admin_required)):
     """Retorna logs da aplicação a partir de backend/app.log com filtros simples."""
     try:
         log_path = os.path.join(os.path.dirname(__file__), "app.log")
@@ -1274,9 +1398,13 @@ async def get_logs(level: Optional[str] = None, agent_id: Optional[str] = None, 
         logger.error(f"Erro ao ler logs: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao ler logs: {str(e)}")
 
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host=config.HOST, port=config.PORT, reload=config.DEBUG)
+
 def generate_sdk_agent_code(agent_request: SDKAgentRequest) -> str:
     """Gera código Python para o agente SDK especializado"""
-    
     specialization_templates = {
         "customer_service": """
 # AGENTE SDK - ATENDIMENTO AO CLIENTE
@@ -1285,20 +1413,20 @@ def generate_sdk_agent_code(agent_request: SDKAgentRequest) -> str:
 
 class CustomerServiceAgent:
     def __init__(self):
-        self.name = "{name}"
+        self.name = {{ name|tojson }}
         self.specialization = "Atendimento ao Cliente"
-        self.model = "{model}"
-        self.whatsapp_config = {whatsapp_config}
-        
+        self.model = {{ model|tojson }}
+        self.whatsapp_config = {{ whatsapp_config|tojson(indent=2) }}
+
     def process_customer_message(self, message, customer_data):
-        \"\"\"Processa mensagens de atendimento\"\"\"
-        
+        '''Processa mensagens de atendimento'''
+
         # Instruções específicas:
-        # {instructions}
-        
+        # {{ instructions|e }}
+
         # Análise de intenção
         intent = self.analyze_intent(message)
-        
+
         if intent == "complaint":
             return self.handle_complaint(message, customer_data)
         elif intent == "support":
@@ -1307,42 +1435,42 @@ class CustomerServiceAgent:
             return self.provide_information(message)
         else:
             return self.default_response(message)
-    
+
     def analyze_intent(self, message):
         # Implementar análise de intenção
         return "support"
-    
+
     def handle_complaint(self, message, customer_data):
         return f"Entendo sua preocupação. Vou registrar sua reclamação e nossa equipe entrará em contato."
-    
+
     def provide_support(self, message, customer_data):
         return f"Como posso ajudá-lo hoje? Estou aqui para resolver sua questão."
-    
+
     def provide_information(self, message):
         return f"Aqui estão as informações solicitadas..."
-        
+
     def default_response(self, message):
         return f"Obrigado por entrar em contato. Como posso ajudá-lo?"
 """,
         "scheduling": """
-# 📅 AGENTE SDK - AGENDAMENTO DE SERVIÇOS  
+# 📅 AGENTE SDK - AGENDAMENTO DE SERVIÇOS
 # Especializado em gestão de agendamentos
 
 class SchedulingAgent:
     def __init__(self):
-        self.name = "{name}"
+        self.name = {{ name|tojson }}
         self.specialization = "Agendamento de Serviços"
-        self.model = "{model}"
-        self.scheduling_config = {scheduling_config}
-        
+        self.model = {{ model|tojson }}
+        self.scheduling_config = {{ scheduling_config|tojson(indent=2) }}
+
     def process_scheduling_request(self, message, customer_data):
-        \"\"\"Processa solicitações de agendamento\"\"\"
-        
+        '''Processa solicitações de agendamento'''
+
         # Instruções específicas:
-        # {instructions}
-        
+        # {{ instructions|e }}
+
         intent = self.analyze_scheduling_intent(message)
-        
+
         if intent == "new_appointment":
             return self.create_appointment(message, customer_data)
         elif intent == "reschedule":
@@ -1353,24 +1481,24 @@ class SchedulingAgent:
             return self.check_availability(message)
         else:
             return self.collect_appointment_info(message)
-    
+
     def analyze_scheduling_intent(self, message):
         # Implementar análise de intenção de agendamento
         return "new_appointment"
-    
+
     def create_appointment(self, message, customer_data):
         # Coletar: nome, telefone, serviço, data/hora preferida
         return f"Vou agendar seu serviço. Preciso de algumas informações: nome completo, telefone e horário preferido."
-    
+
     def reschedule_appointment(self, message, customer_data):
         return f"Vou ajudar você a reagendar. Qual seria o novo horário de sua preferência?"
-    
+
     def cancel_appointment(self, message, customer_data):
         return f"Posso cancelar seu agendamento. Poderia confirmar os dados?"
-    
+
     def check_availability(self, message):
         return f"Verificando disponibilidade... Temos horários disponíveis em..."
-    
+
     def collect_appointment_info(self, message):
         return f"Para confirmar seu agendamento, preciso das seguintes informações..."
 """,
@@ -1380,19 +1508,19 @@ class SchedulingAgent:
 
 class SalesAgent:
     def __init__(self):
-        self.name = "{name}"
+        self.name = {{ name|tojson }}
         self.specialization = "Processo de Vendas"
-        self.model = "{model}"
-        self.sales_config = {{"leads_system": "active"}}
-        
+        self.model = {{ model|tojson }}
+        self.sales_config = {"leads_system": "active"}
+
     def process_sales_interaction(self, message, lead_data):
-        \"\"\"Processa interações de vendas\"\"\"
-        
+        '''Processa interações de vendas'''
+
         # Instruções específicas:
-        # {instructions}
-        
+        # {{ instructions|e }}
+
         stage = self.identify_sales_stage(message, lead_data)
-        
+
         if stage == "awareness":
             return self.create_awareness(message, lead_data)
         elif stage == "interest":
@@ -1403,41 +1531,44 @@ class SalesAgent:
             return self.close_sale(message, lead_data)
         else:
             return self.qualify_lead(message)
-    
+
     def identify_sales_stage(self, message, lead_data):
         # Implementar identificação de estágio de vendas
         return "interest"
-    
+
     def create_awareness(self, message, lead_data):
         return f"Conheça nossas soluções que podem revolucionar seu negócio..."
-    
+
     def generate_interest(self, message, lead_data):
         return f"Vou mostrar como nossos serviços podem beneficiar especificamente seu caso..."
-    
+
     def facilitate_consideration(self, message, lead_data):
         return f"Que tal agendar uma demonstração personalizada? Posso mostrar resultados reais..."
-    
+
     def close_sale(self, message, lead_data):
         return f"Excelente! Vou preparar uma proposta personalizada para você..."
-    
+
     def qualify_lead(self, message):
         return f"Para oferecer a melhor solução, preciso entender melhor suas necessidades..."
-    
+
     def follow_up_lead(self, lead_data):
         return f"Continuando nossa conversa sobre como podemos ajudar seu negócio..."
-"""
+""",
     }
-    
-    template = specialization_templates.get(agent_request.specialization, specialization_templates["customer_service"])
-    
-    return template.format(
-        name=agent_request.name,
-        model=agent_request.model,
-        instructions=agent_request.instructions,
-        whatsapp_config=json.dumps(agent_request.whatsapp_config, indent=2),
-        scheduling_config=json.dumps(agent_request.scheduling_config, indent=2)
-    )
 
+    template_str = specialization_templates.get(
+        agent_request.specialization, specialization_templates["customer_service"]
+    )
+    env = Environment(loader=BaseLoader(), autoescape=True)
+    template = env.from_string(template_str)
+    return template.render(
+        name=sanitize_input(agent_request.name),
+        model=sanitize_input(agent_request.model),
+        instructions=sanitize_input(agent_request.instructions),
+        whatsapp_config=agent_request.whatsapp_config,
+        scheduling_config=agent_request.scheduling_config,
+    )
+=======
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host=config.HOST, port=config.PORT, reload=config.DEBUG)

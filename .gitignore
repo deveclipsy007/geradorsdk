@@ -19,6 +19,9 @@ uploads/
 .DS_Store
 Thumbs.db
 
+# Frontend configuration
+frontend/config.js
+
 # IDE files
 .vscode/
 .idea/

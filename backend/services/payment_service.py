@@ -4,8 +4,8 @@ Handles payment link generation and processing
 """
 
 import stripe
-import requests
-import json
+import asyncio
+import aiohttp
 import logging
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
@@ -53,17 +53,17 @@ class StripePaymentService:
             Dict with payment link data
         """
         try:
-            # Create price object
-            price = stripe.Price.create(
+            # Create price object using a thread to avoid blocking
+            price = await asyncio.to_thread(
+                stripe.Price.create,
                 unit_amount=int(amount * 100),  # Convert to cents
                 currency=currency,
-                product_data={
-                    'name': description or 'Pagamento SDK Agent'
-                }
+                product_data={'name': description or 'Pagamento SDK Agent'}
             )
-            
-            # Create payment link
-            payment_link = stripe.PaymentLink.create(
+
+            # Create payment link in a separate thread
+            payment_link = await asyncio.to_thread(
+                stripe.PaymentLink.create,
                 line_items=[{
                     'price': price.id,
                     'quantity': 1,
@@ -122,7 +122,10 @@ class StripePaymentService:
     async def get_payment_status(self, payment_link_id: str) -> Dict[str, Any]:
         """Get payment link status from Stripe"""
         try:
-            payment_link = stripe.PaymentLink.retrieve(payment_link_id)
+            payment_link = await asyncio.to_thread(
+                stripe.PaymentLink.retrieve,
+                payment_link_id
+            )
             return {
                 'success': True,
                 'status': payment_link.active,
@@ -205,21 +208,26 @@ class AsaasPaymentService:
             if customer_data and customer_data.get('success'):
                 payment_data["customer"] = customer_data["customer_id"]
             
-            # Create payment
-            response = requests.post(
-                f"{self.base_url}/payments",
-                headers=self.headers,
-                json=payment_data
-            )
-            
-            if response.status_code == 200:
-                payment = response.json()
-                
+            # Create payment using aiohttp for non-blocking request
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.post(
+                    f"{self.base_url}/payments",
+                    json=payment_data
+                ) as response:
+                    if response.status == 200:
+                        payment = await response.json()
+                        error_msg = None
+                    else:
+                        error_data = await response.json()
+                        error_msg = error_data.get("errors", [{"description": f"HTTP {response.status}"}])[0]["description"]
+                        payment = None
+
+            if payment:
                 # Generate PIX QR Code if PIX payment
                 pix_data = None
                 if billing_type in ["PIX", "UNDEFINED"]:
                     pix_data = await self._generate_pix_qr_code(payment["id"])
-                
+
                 return {
                     'success': True,
                     'payment_id': payment["id"],
@@ -236,7 +244,6 @@ class AsaasPaymentService:
                     'provider': 'asaas'
                 }
             else:
-                error_msg = response.json().get("errors", [{"description": "Unknown error"}])[0]["description"]
                 return {
                     'success': False,
                     'error': error_msg,
@@ -262,19 +269,19 @@ class AsaasPaymentService:
                 search_params["cpfCnpj"] = cpf
             
             if search_params:
-                response = requests.get(
-                    f"{self.base_url}/customers",
-                    headers=self.headers,
-                    params=search_params
-                )
-                
-                if response.status_code == 200:
-                    customers = response.json()["data"]
-                    if customers:
-                        return {
-                            'success': True,
-                            'customer_id': customers[0]["id"]
-                        }
+                async with aiohttp.ClientSession(headers=self.headers) as session:
+                    async with session.get(
+                        f"{self.base_url}/customers",
+                        params=search_params
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            customers = data["data"]
+                            if customers:
+                                return {
+                                    'success': True,
+                                    'customer_id': customers[0]["id"]
+                                }
             
             # Create new customer
             customer_data = {
@@ -283,20 +290,19 @@ class AsaasPaymentService:
                 "cpfCnpj": cpf
             }
             
-            response = requests.post(
-                f"{self.base_url}/customers",
-                headers=self.headers,
-                json=customer_data
-            )
-            
-            if response.status_code == 200:
-                customer = response.json()
-                return {
-                    'success': True,
-                    'customer_id': customer["id"]
-                }
-            else:
-                return {'success': False, 'error': 'Failed to create customer'}
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.post(
+                    f"{self.base_url}/customers",
+                    json=customer_data
+                ) as response:
+                    if response.status == 200:
+                        customer = await response.json()
+                        return {
+                            'success': True,
+                            'customer_id': customer["id"]
+                        }
+                    else:
+                        return {'success': False, 'error': 'Failed to create customer'}
                 
         except Exception as e:
             logger.error(f"Error managing Asaas customer: {str(e)}")
@@ -305,15 +311,14 @@ class AsaasPaymentService:
     async def _generate_pix_qr_code(self, payment_id: str) -> Dict[str, Any]:
         """Generate PIX QR code for payment"""
         try:
-            response = requests.get(
-                f"{self.base_url}/payments/{payment_id}/pixQrCode",
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {}
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(
+                    f"{self.base_url}/payments/{payment_id}/pixQrCode"
+                ) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    else:
+                        return {}
                 
         except Exception as e:
             logger.error(f"Error generating PIX QR code: {str(e)}")
@@ -322,26 +327,25 @@ class AsaasPaymentService:
     async def get_payment_status(self, payment_id: str) -> Dict[str, Any]:
         """Get payment status from Asaas"""
         try:
-            response = requests.get(
-                f"{self.base_url}/payments/{payment_id}",
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                payment = response.json()
-                return {
-                    'success': True,
-                    'status': payment.get("status"),
-                    'value': payment.get("value"),
-                    'due_date': payment.get("dueDate"),
-                    'provider': 'asaas'
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': 'Payment not found',
-                    'provider': 'asaas'
-                }
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(
+                    f"{self.base_url}/payments/{payment_id}"
+                ) as response:
+                    if response.status == 200:
+                        payment = await response.json()
+                        return {
+                            'success': True,
+                            'status': payment.get("status"),
+                            'value': payment.get("value"),
+                            'due_date': payment.get("dueDate"),
+                            'provider': 'asaas'
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'error': 'Payment not found',
+                            'provider': 'asaas'
+                        }
                 
         except Exception as e:
             logger.error(f"Error getting Asaas payment status: {str(e)}")
