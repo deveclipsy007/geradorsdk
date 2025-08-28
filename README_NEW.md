@@ -142,6 +142,8 @@ HOST=0.0.0.0
 PORT=8000
 DEBUG=false
 DATABASE_URL=sqlite:///./agents.db
+# Origens permitidas (separadas por vírgula)
+CORS_ORIGINS=https://seu-dominio.com
 ```
 
 ## ⚡ Execução e Acesso
