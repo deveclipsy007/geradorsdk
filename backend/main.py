@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("[INICIO] Iniciando SDK Agentes Especializados...")
     
+    # Initialize database explicitly on startup
     if not init_database():
         logger.error("Falha na inicialização do banco de dados")
         raise RuntimeError("Database initialization failed")

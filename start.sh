@@ -121,6 +121,6 @@ cleanup() {
 trap cleanup INT
 
 # Iniciar servidor
-$PYTHON_CMD main.py
+$PYTHON_CMD -m uvicorn main:app --host 0.0.0.0 --port 8001
 
 log_info "Servidor finalizado."
