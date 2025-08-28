@@ -121,21 +121,25 @@ GROQ_API_KEY=gsk_xxxxx                      # Llama 3/Mixtral
 
 # === INTEGRAÇÕES EMPRESARIAIS ===
 # WhatsApp (Evolution API)
-EVOLUTION_API_URL=https://api.evolution.com
-EVOLUTION_API_KEY=your-evolution-key
+EVOLUTION_API_URL=https://api.evolution.com          # URL base da Evolution API
+EVOLUTION_API_KEY=your-evolution-key                 # Chave de autenticação do WhatsApp
 
 # Google Calendar
-GOOGLE_CALENDAR_CREDENTIALS=path/to/credentials.json
+GOOGLE_CALENDAR_CREDENTIALS=path/to/credentials.json # Caminho do arquivo de credenciais
 
-# E-mail (SMTP)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
+# E-mail
+SENDGRID_API_KEY=your-sendgrid-key                   # Chave API do SendGrid (opcional)
+SMTP_SERVER=smtp.gmail.com                           # Servidor SMTP
+SMTP_PORT=587                                       # Porta SMTP
+SMTP_USERNAME=your-email@gmail.com                  # Usuário SMTP
+SMTP_PASSWORD=your-app-password                     # Senha ou token SMTP
+SMTP_USE_TLS=true                                   # Habilita TLS
 
 # Pagamentos
-STRIPE_SECRET_KEY=sk_test_xxxxx
-ASAAS_API_KEY=your-asaas-key
+STRIPE_SECRET_KEY=sk_test_xxxxx                      # Chave secreta do Stripe
+STRIPE_WEBHOOK_SECRET=whsec_xxxxx                    # Segredo do webhook Stripe
+ASAAS_API_KEY=your-asaas-key                         # Chave da API Asaas
+ASAAS_SANDBOX=true                                   # Usa ambiente sandbox do Asaas
 
 # === CONFIGURAÇÕES DO SISTEMA ===
 HOST=0.0.0.0
