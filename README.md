@@ -188,6 +188,21 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 | **📊 Estatísticas** | http://localhost:8000/api/system/stats | Métricas em tempo real |
 | **⚙️ Configurações** | http://localhost:8000/api/config | Configurações ativas |
 
+### 🔐 Autenticação
+
+1. Obtenha um token JWT enviando suas credenciais para `/token`:
+
+```bash
+curl -X POST "http://localhost:8000/token" -F "username=admin" -F "password=admin"
+```
+
+2. Utilize o token retornado em `Authorization: Bearer <token>` para consumir os endpoints protegidos.
+
+**Níveis de permissão**
+
+- `admin`: acesso completo (criação/listagem/gestão de agentes e integrações)
+- `user`: acesso limitado a operações de chat
+
 ## 📖 Guia de Uso
 
 ### 🤖 1. Criar Agentes SDK
