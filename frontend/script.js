@@ -1,5 +1,7 @@
 // API Base URL
-const API_BASE_URL = 'http://localhost:8001/api';
+const API_BASE_URL = window.API_BASE_URL || '/api';
+=======
+const API_BASE_URL = 'http://localhost:8000/api';
 
 // Configuration constants
 const CONFIG = {
@@ -130,7 +132,7 @@ async function checkSystemHealth() {
         } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
             statusText.textContent = 'Sistema offline (conexão)';
             console.warn('Network error during health check:', error);
-            showToast('Não foi possível conectar ao backend. Verifique se está rodando na porta 8001.', 'error');
+            showToast('Não foi possível conectar ao backend. Verifique se está rodando na porta 8000.', 'error');
         } else {
             statusText.textContent = 'Sistema offline';
             console.warn('System health check failed:', error);

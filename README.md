@@ -121,28 +121,45 @@ GROQ_API_KEY=gsk_xxxxx                      # Llama 3/Mixtral
 
 # === INTEGRAÇÕES EMPRESARIAIS ===
 # WhatsApp (Evolution API)
-EVOLUTION_API_URL=https://api.evolution.com
-EVOLUTION_API_KEY=your-evolution-key
+EVOLUTION_API_URL=https://api.evolution.com          # URL base da Evolution API
+EVOLUTION_API_KEY=your-evolution-key                 # Chave de autenticação do WhatsApp
 
 # Google Calendar
-GOOGLE_CALENDAR_CREDENTIALS=path/to/credentials.json
+GOOGLE_CALENDAR_CREDENTIALS=path/to/credentials.json # Caminho do arquivo de credenciais
 
-# E-mail (SMTP)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
+# E-mail
+SENDGRID_API_KEY=your-sendgrid-key                   # Chave API do SendGrid (opcional)
+SMTP_SERVER=smtp.gmail.com                           # Servidor SMTP
+SMTP_PORT=587                                       # Porta SMTP
+SMTP_USERNAME=your-email@gmail.com                  # Usuário SMTP
+SMTP_PASSWORD=your-app-password                     # Senha ou token SMTP
+SMTP_USE_TLS=true                                   # Habilita TLS
 
 # Pagamentos
-STRIPE_SECRET_KEY=sk_test_xxxxx
-ASAAS_API_KEY=your-asaas-key
+STRIPE_SECRET_KEY=sk_test_xxxxx                      # Chave secreta do Stripe
+STRIPE_WEBHOOK_SECRET=whsec_xxxxx                    # Segredo do webhook Stripe
+ASAAS_API_KEY=your-asaas-key                         # Chave da API Asaas
+ASAAS_SANDBOX=true                                   # Usa ambiente sandbox do Asaas
 
 # === CONFIGURAÇÕES DO SISTEMA ===
 HOST=0.0.0.0
 PORT=8000
 DEBUG=false
 DATABASE_URL=sqlite:///./agents.db
+RATE_LIMIT=100/minute
+=======
+# Origens permitidas (separadas por vírgula)
+CORS_ORIGINS=https://seu-dominio.com
 ```
+
+### 🌐 Configuração do Frontend
+
+O frontend obtém a URL da API a partir de `window.API_BASE_URL`. Para personalizar:
+
+1. Copie `frontend/config.example.js` para `frontend/config.js` e ajuste o valor desejado.
+2. Alternativamente, defina a variável de ambiente `API_BASE_URL` antes de executar `start_frontend.sh` ou `start_frontend.bat` e o arquivo será gerado automaticamente.
+
+Se nenhuma configuração for fornecida, o frontend usará o caminho relativo `/api`.
 
 ## ⚡ Execução e Acesso
 
@@ -171,7 +188,32 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 | **📚 Documentação API** | http://localhost:8000/docs | Swagger/OpenAPI interativo |
 | **❤️ Health Check** | http://localhost:8000/health | Monitor de saúde do sistema |
 | **📊 Estatísticas** | http://localhost:8000/api/system/stats | Métricas em tempo real |
+| **📈 Métricas Prometheus** | http://localhost:8000/metrics | Monitoramento de uso |
 | **⚙️ Configurações** | http://localhost:8000/api/config | Configurações ativas |
+
+## 📊 Rate Limiting
+
+O backend aplica um limite padrão de **100 requisições por minuto por IP**.
+Esse limite pode ser ajustado configurando a variável `RATE_LIMIT` no `.env`
+com o formato `<número>/<período>` (por exemplo, `200/minute` ou `1000/day`).
+
+As métricas de uso e de requisições bloqueadas estão disponíveis em `/metrics`
+no formato Prometheus para facilitar o monitoramento e a calibração das políticas.
+=======
+### 🔐 Autenticação
+
+1. Obtenha um token JWT enviando suas credenciais para `/token`:
+
+```bash
+curl -X POST "http://localhost:8000/token" -F "username=admin" -F "password=admin"
+```
+
+2. Utilize o token retornado em `Authorization: Bearer <token>` para consumir os endpoints protegidos.
+
+**Níveis de permissão**
+
+- `admin`: acesso completo (criação/listagem/gestão de agentes e integrações)
+- `user`: acesso limitado a operações de chat
 
 ## 📖 Guia de Uso
 
@@ -520,7 +562,7 @@ Veja o arquivo [LICENSE](LICENSE) para detalhes completos.
 
 | Problema | Solução |
 |----------|---------|
-| **Porta em uso** | Altere `PORT=8001` no `.env` |
+| **Porta em uso** | Altere `PORT` no `.env` para uma porta livre |
 | **API Key inválida** | Verifique configuração no `.env` |
 | **Banco não conecta** | Verifique `DATABASE_URL` |
 | **Módulo não encontrado** | Ative ambiente virtual |

@@ -19,7 +19,7 @@ class Config:
     
     # Configurações do Servidor
     HOST = os.getenv("HOST", "0.0.0.0")
-    PORT = int(os.getenv("PORT", "8001"))  # Alinhado com frontend
+    PORT = int(os.getenv("PORT", "8000"))  # Alinhado com frontend
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     
     # Configurações de API Keys
@@ -41,6 +41,9 @@ class Config:
     # Configurações de Logs
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     LOG_FILE = os.getenv("LOG_FILE", "app.log")
+
+    # Configurações de Rate Limiting
+    RATE_LIMIT = os.getenv("RATE_LIMIT", "100/minute")
     
     # Configurações do OCM Drizzy (Stub)
     DRIZZY_ENABLED = os.getenv("DRIZZY_ENABLED", "true").lower() == "true"
@@ -132,13 +135,13 @@ class Config:
 class DevelopmentConfig(Config):
     DEBUG = True
     DATABASE_ECHO = True
-    LOG_LEVEL = "DEBUG"
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
 
 # Configuração de produção
 class ProductionConfig(Config):
     DEBUG = False
     DATABASE_ECHO = False
-    LOG_LEVEL = "WARNING"
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "WARNING")
     CORS_ORIGINS = ["https://your-domain.com"]
 
 # Configuração de teste
@@ -146,6 +149,7 @@ class TestingConfig(Config):
     DATABASE_URL = "sqlite:///:memory:"
     DEBUG = True
     DATABASE_ECHO = False
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # Determinar configuração atual
 def get_config() -> Config:

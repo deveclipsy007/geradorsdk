@@ -4,6 +4,7 @@ Handles calendar events, scheduling, and availability management
 """
 
 import logging
+import asyncio
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 import json
@@ -66,10 +67,12 @@ class GoogleCalendarService:
             
             # Refresh credentials if needed
             if self.credentials and self.credentials.expired and self.credentials.refresh_token:
-                self.credentials.refresh(Request())
-            
+                await asyncio.to_thread(self.credentials.refresh, Request())
+
             if self.credentials and self.credentials.valid:
-                self.service = build('calendar', 'v3', credentials=self.credentials)
+                self.service = await asyncio.to_thread(
+                    build, 'calendar', 'v3', credentials=self.credentials
+                )
                 return {
                     'success': True,
                     'message': 'Google Calendar service initialized successfully',
@@ -178,13 +181,16 @@ class GoogleCalendarService:
                 }
             }
             
-            # Create the event
-            created_event = self.service.events().insert(
-                calendarId=calendar_id,
-                body=event,
-                conferenceDataVersion=1,
-                sendUpdates='all'
-            ).execute()
+            # Create the event in a thread to avoid blocking
+            def _insert():
+                return self.service.events().insert(
+                    calendarId=calendar_id,
+                    body=event,
+                    conferenceDataVersion=1,
+                    sendUpdates='all'
+                ).execute()
+
+            created_event = await asyncio.to_thread(_insert)
             
             return {
                 'success': True,
@@ -243,15 +249,18 @@ class GoogleCalendarService:
             if not end_date:
                 end_date = start_date + timedelta(days=30)
             
-            # Get events
-            events_result = self.service.events().list(
-                calendarId=calendar_id,
-                timeMin=start_date.isoformat() + 'Z',
-                timeMax=end_date.isoformat() + 'Z',
-                maxResults=max_results,
-                singleEvents=True,
-                orderBy='startTime'
-            ).execute()
+            # Get events in a thread to avoid blocking
+            def _list():
+                return self.service.events().list(
+                    calendarId=calendar_id,
+                    timeMin=start_date.isoformat() + 'Z',
+                    timeMax=end_date.isoformat() + 'Z',
+                    maxResults=max_results,
+                    singleEvents=True,
+                    orderBy='startTime'
+                ).execute()
+
+            events_result = await asyncio.to_thread(_list)
             
             events = events_result.get('items', [])
             
@@ -394,11 +403,14 @@ class GoogleCalendarService:
                     'error': 'Google Calendar service not initialized'
                 }
             
-            # Get existing event
-            event = self.service.events().get(
-                calendarId=calendar_id,
-                eventId=event_id
-            ).execute()
+            # Get existing event in a thread
+            def _get():
+                return self.service.events().get(
+                    calendarId=calendar_id,
+                    eventId=event_id
+                ).execute()
+
+            event = await asyncio.to_thread(_get)
             
             # Update fields if provided
             if title:
@@ -416,13 +428,16 @@ class GoogleCalendarService:
                     'timeZone': 'America/Sao_Paulo',
                 }
             
-            # Update the event
-            updated_event = self.service.events().update(
-                calendarId=calendar_id,
-                eventId=event_id,
-                body=event,
-                sendUpdates='all'
-            ).execute()
+            # Update the event in a thread
+            def _update():
+                return self.service.events().update(
+                    calendarId=calendar_id,
+                    eventId=event_id,
+                    body=event,
+                    sendUpdates='all'
+                ).execute()
+
+            updated_event = await asyncio.to_thread(_update)
             
             return {
                 'success': True,
@@ -466,12 +481,15 @@ class GoogleCalendarService:
                     'error': 'Google Calendar service not initialized'
                 }
             
-            # Delete the event
-            self.service.events().delete(
-                calendarId=calendar_id,
-                eventId=event_id,
-                sendUpdates='all'
-            ).execute()
+            # Delete the event in a thread
+            def _delete():
+                self.service.events().delete(
+                    calendarId=calendar_id,
+                    eventId=event_id,
+                    sendUpdates='all'
+                ).execute()
+
+            await asyncio.to_thread(_delete)
             
             return {
                 'success': True,

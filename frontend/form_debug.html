@@ -117,6 +117,7 @@ Se aparecer algum erro em vermelho, copie e cole aqui para análise.
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
         function displayResult(elementId, message, type = 'info') {
             const element = document.getElementById(elementId);
@@ -203,7 +204,7 @@ Se aparecer algum erro em vermelho, copie e cole aqui para análise.
                     };
                     
                     try {
-                        const response = await fetch('http://localhost:8001/api/agents', {
+                        const response = await fetch('http://localhost:8000/api/agents', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
