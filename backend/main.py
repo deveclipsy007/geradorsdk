@@ -1,5 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import uuid
@@ -67,6 +72,17 @@ class ChatResponse(BaseModel):
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Métricas Prometheus
+REQUEST_COUNT = Counter(
+    "sdk_requests_total", "Total de requisições HTTP", ["method", "endpoint"]
+)
+RATE_LIMIT_EXCEEDED = Counter(
+    "sdk_rate_limit_exceeded_total", "Total de requisições bloqueadas"
+)
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=[config.RATE_LIMIT])
+
 # Lifespan events
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -91,6 +107,28 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    RATE_LIMIT_EXCEEDED.inc()
+    return await _rate_limit_exceeded_handler(request, exc)
+
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    response = await call_next(request)
+    REQUEST_COUNT.labels(method=request.method, endpoint=request.url.path).inc()
+    return response
+
+
+@limiter.exempt
+@app.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
@@ -101,6 +139,7 @@ app.add_middleware(
 )
 
 # Health check endpoint
+@limiter.exempt
 @app.get("/api/health")
 @app.get("/health")
 async def health_check():

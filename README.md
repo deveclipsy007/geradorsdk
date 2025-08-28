@@ -142,6 +142,7 @@ HOST=0.0.0.0
 PORT=8000
 DEBUG=false
 DATABASE_URL=sqlite:///./agents.db
+RATE_LIMIT=100/minute
 ```
 
 ## ⚡ Execução e Acesso
@@ -171,7 +172,17 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 | **📚 Documentação API** | http://localhost:8000/docs | Swagger/OpenAPI interativo |
 | **❤️ Health Check** | http://localhost:8000/health | Monitor de saúde do sistema |
 | **📊 Estatísticas** | http://localhost:8000/api/system/stats | Métricas em tempo real |
+| **📈 Métricas Prometheus** | http://localhost:8000/metrics | Monitoramento de uso |
 | **⚙️ Configurações** | http://localhost:8000/api/config | Configurações ativas |
+
+## 📊 Rate Limiting
+
+O backend aplica um limite padrão de **100 requisições por minuto por IP**.
+Esse limite pode ser ajustado configurando a variável `RATE_LIMIT` no `.env`
+com o formato `<número>/<período>` (por exemplo, `200/minute` ou `1000/day`).
+
+As métricas de uso e de requisições bloqueadas estão disponíveis em `/metrics`
+no formato Prometheus para facilitar o monitoramento e a calibração das políticas.
 
 ## 📖 Guia de Uso
 
