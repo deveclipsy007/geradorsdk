@@ -88,7 +88,7 @@
 
     <script>
         // Configurações
-        const API_BASE_URL = 'http://localhost:8001/api';
+        const API_BASE_URL = 'http://localhost:8000/api';
 
         // Função utilitária para fetch com timeout
         async function fetchWithTimeout(url, options = {}) {
@@ -150,7 +150,7 @@
                 }
             } catch (error) {
                 displayResult('backend-result', 
-                    `❌ Erro de conexão: ${error.message}\n\nVerifique se o backend está rodando em localhost:8001`, 
+                    `❌ Erro de conexão: ${error.message}\n\nVerifique se o backend está rodando em localhost:8000`,
                     'error'
                 );
             }
