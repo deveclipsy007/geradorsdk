@@ -76,7 +76,13 @@ async def lifespan(app: FastAPI):
     if not init_database():
         logger.error("Falha na inicialização do banco de dados")
         raise RuntimeError("Database initialization failed")
-    
+
+    # Validar chaves de API configuradas
+    api_keys_status = config.validate_api_keys()
+    missing_keys = [k for k, v in api_keys_status.items() if not v]
+    if missing_keys:
+        logger.warning(f"Chaves de API ausentes: {', '.join(missing_keys)}")
+
     logger.info("[OK] Sistema SDK iniciado com sucesso!")
     
     yield
@@ -288,6 +294,9 @@ Responda de forma natural, útil e consistente com sua especialização. Mantenh
 
 async def call_anthropic_api(messages: List[Dict], model: str) -> str:
     """Chama a API da Anthropic/Claude"""
+    if not config.ANTHROPIC_API_KEY:
+        logger.error("ANTHROPIC_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY não configurada")
     try:
         # Separar system message das outras mensagens
         system_message = ""
@@ -324,6 +333,9 @@ async def call_anthropic_api(messages: List[Dict], model: str) -> str:
 
 async def call_openai_api(messages: List[Dict], model: str) -> str:
     """Chama a API da OpenAI"""
+    if not config.OPENAI_API_KEY:
+        logger.error("OPENAI_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY não configurada")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -349,6 +361,9 @@ async def call_openai_api(messages: List[Dict], model: str) -> str:
 
 async def call_groq_api(messages: List[Dict], model: str) -> str:
     """Chama a API do Groq"""
+    if not config.GROQ_API_KEY:
+        logger.error("GROQ_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY não configurada")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
