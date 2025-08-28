@@ -8,11 +8,10 @@ from sqlalchemy.orm import sessionmaker, Session, relationship
 from sqlalchemy.sql import func
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
-import json
 import uuid
 from contextlib import contextmanager
 
-from config import config
+from .config import config
 
 # Base para modelos
 Base = declarative_base()
@@ -82,6 +81,25 @@ class Agent(Base):
             "model": self.model,
         }
 
+    @classmethod
+    def create(cls, db: Session, **kwargs) -> "Agent":
+        """Cria e persiste um novo agente"""
+        agent = cls(**kwargs)
+        db.add(agent)
+        db.flush()
+        db.refresh(agent)
+        return agent
+
+    @classmethod
+    def get_by_id(cls, db: Session, agent_id: str) -> Optional["Agent"]:
+        """Busca um agente pelo ID"""
+        return db.query(cls).filter(cls.id == agent_id).first()
+
+    @classmethod
+    def list(cls, db: Session) -> List["Agent"]:
+        """Lista todos os agentes ordenados por nome"""
+        return db.query(cls).order_by(cls.name.asc()).all()
+
 
 class ChatMessage(Base):
     """Mensagens de chat por agente/sessão"""
@@ -107,6 +125,34 @@ class ChatMessage(Base):
             "content": self.content,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+    @classmethod
+    def create(cls, db: Session, **kwargs) -> "ChatMessage":
+        """Cria e persiste uma nova mensagem de chat"""
+        message = cls(**kwargs)
+        db.add(message)
+        db.flush()
+        db.refresh(message)
+        return message
+
+    @classmethod
+    def get_messages(
+        cls,
+        db: Session,
+        agent_id: str,
+        session_id: Optional[str] = None,
+        limit: int = 100,
+        asc: bool = True,
+    ) -> List["ChatMessage"]:
+        """Recupera mensagens de um agente/sessão"""
+        query = db.query(cls).filter(cls.agent_id == agent_id)
+        if session_id:
+            query = query.filter(cls.session_id == session_id)
+        order = cls.created_at.asc() if asc else cls.created_at.desc()
+        query = query.order_by(order)
+        if limit:
+            query = query.limit(limit)
+        return query.all()
 
 
 # Função para obter sessão do banco
@@ -177,3 +223,7 @@ def init_database():
     except Exception as e:
         print(f"[ERRO] Erro ao inicializar banco de dados: {str(e)}")
         return False
+
+# Auto-inicialização quando o módulo é importado
+if __name__ != "__main__":
+    init_database()
