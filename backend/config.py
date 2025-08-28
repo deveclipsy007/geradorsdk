@@ -41,6 +41,9 @@ class Config:
     # Configurações de Logs
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     LOG_FILE = os.getenv("LOG_FILE", "app.log")
+
+    # Configurações de Rate Limiting
+    RATE_LIMIT = os.getenv("RATE_LIMIT", "100/minute")
     
     # Configurações do OCM Drizzy (Stub)
     DRIZZY_ENABLED = os.getenv("DRIZZY_ENABLED", "true").lower() == "true"
