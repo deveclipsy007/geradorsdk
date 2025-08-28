@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import uuid
-import json
 import os
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
@@ -13,8 +12,8 @@ import httpx
 import asyncio
 
 # Imports dos módulos
-from config import config
-from database import init_database, DatabaseManager, get_db_session, Agent
+from .config import config
+from .database import init_database, DatabaseManager, get_db_session, Agent, ChatMessage
 
 # Import services
 from services.payment_service import PaymentManager
@@ -107,10 +106,7 @@ async def health_check():
     """Endpoint de verificação de saúde do sistema"""
     try:
         with get_db_session() as db:
-            # Usar query direta para contar
-            from sqlalchemy import text
-            result = db.execute(text("SELECT COUNT(*) as count FROM agents"))
-            count = result.scalar()
+            count = db.query(Agent).count()
         
         return {
             "status": "healthy",
@@ -137,24 +133,19 @@ async def create_sdk_agent(agent_request: SDKAgentRequest):
         # Create agent in database
         agent_id = str(uuid.uuid4())
         with get_db_session() as db:
-            from sqlalchemy import text
-            db.execute(text("""
-                INSERT INTO agents (id, name, description, specialization, model, instructions, 
-                                  whatsapp_config, scheduling_config, status, created_by) 
-                VALUES (:id, :name, :description, :specialization, :model, :instructions, 
-                        :whatsapp_config, :scheduling_config, :status, :created_by)
-            """), {
-                "id": agent_id,
-                "name": agent_request.name,
-                "description": agent_request.description,
-                "specialization": agent_request.specialization,
-                "model": agent_request.model,
-                "instructions": agent_request.instructions,
-                "whatsapp_config": json.dumps(agent_request.whatsapp_config),
-                "scheduling_config": json.dumps(agent_request.scheduling_config),
-                "status": "created",
-                "created_by": "sdk_system"
-            })
+            Agent.create(
+                db,
+                id=agent_id,
+                name=agent_request.name,
+                description=agent_request.description,
+                specialization=agent_request.specialization,
+                model=agent_request.model,
+                instructions=agent_request.instructions,
+                whatsapp_config=agent_request.whatsapp_config,
+                scheduling_config=agent_request.scheduling_config,
+                status="created",
+                created_by="sdk_system",
+            )
         
         return SDKAgentResponse(
             id=agent_id,
@@ -174,26 +165,9 @@ async def create_sdk_agent(agent_request: SDKAgentRequest):
 async def list_sdk_agents():
     """Lista todos os agentes SDK criados"""
     try:
-        from sqlalchemy import text
         with get_db_session() as db:
-            result = db.execute(text("""
-                SELECT id, name, description, specialization, model, status
-                FROM agents 
-                ORDER BY name ASC
-            """))
-            
-            agents = []
-            for row in result:
-                agents.append({
-                    "id": row.id,
-                    "name": row.name,
-                    "description": row.description,
-                    "specialization": row.specialization,
-                    "model": row.model,
-                    "status": row.status
-                })
-            
-            return agents
+            agents = Agent.list(db)
+            return [agent.to_summary() for agent in agents]
         
     except Exception as e:
         logger.error(f"Erro ao listar agentes: {str(e)}")
@@ -204,29 +178,21 @@ async def list_sdk_agents():
 async def get_sdk_agent(agent_id: str):
     """Obtém detalhes de um agente SDK específico"""
     try:
-        from sqlalchemy import text
         with get_db_session() as db:
-            result = db.execute(text("""
-                SELECT id, name, description, specialization, model, instructions, 
-                       whatsapp_config, scheduling_config, status
-                FROM agents 
-                WHERE id = :agent_id
-            """), {"agent_id": agent_id})
-            
-            row = result.first()
-            if not row:
+            agent = Agent.get_by_id(db, agent_id)
+            if not agent:
                 raise HTTPException(status_code=404, detail="Agente não encontrado")
-                
+
             return {
-                "id": row.id,
-                "name": row.name,
-                "description": row.description,
-                "specialization": row.specialization,
-                "model": row.model,
-                "instructions": row.instructions,
-                "whatsapp_config": json.loads(row.whatsapp_config) if row.whatsapp_config else {},
-                "scheduling_config": json.loads(row.scheduling_config) if row.scheduling_config else {},
-                "status": row.status
+                "id": agent.id,
+                "name": agent.name,
+                "description": agent.description,
+                "specialization": agent.specialization,
+                "model": agent.model,
+                "instructions": agent.instructions,
+                "whatsapp_config": agent.whatsapp_config or {},
+                "scheduling_config": agent.scheduling_config or {},
+                "status": agent.status,
             }
         
     except HTTPException:
@@ -381,11 +347,9 @@ async def call_groq_api(messages: List[Dict], model: str) -> str:
 async def chat_with_agent(agent_id: str, chat: ChatRequest):
     """Envia mensagem ao agente e retorna a resposta com histórico da sessão"""
     try:
-        from sqlalchemy import text
         # Verificar se o agente existe e buscar suas configurações
         with get_db_session() as db:
-            result = db.execute(text("SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
-            agent_data = result.first()
+            agent_data = Agent.get_by_id(db, agent_id)
             if not agent_data:
                 raise HTTPException(status_code=404, detail="Agente não encontrado")
 
@@ -393,75 +357,40 @@ async def chat_with_agent(agent_id: str, chat: ChatRequest):
 
         # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
         with get_db_session() as db:
-            history_result = db.execute(text(
-                """
-                SELECT role, content FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
-            
-            chat_history = []
-            for row in history_result:
-                chat_history.append({"role": row.role, "content": row.content})
+            history_result = ChatMessage.get_messages(db, agent_id, session_id, asc=True)
+            chat_history = [{"role": m.role, "content": m.content} for m in history_result]
 
         # Gerar resposta inteligente do agente usando LLM
         agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
 
         # Persistir mensagem do usuário
         with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": chat.user_id,
-                "role": "user",
-                "content": chat.message,
-            })
+            ChatMessage.create(
+                db,
+                id=str(uuid.uuid4()),
+                agent_id=agent_id,
+                session_id=session_id,
+                user_id=chat.user_id,
+                role="user",
+                content=chat.message,
+            )
 
         # Persistir resposta do agente
         with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": None,
-                "role": "assistant",
-                "content": agent_reply,
-            })
+            ChatMessage.create(
+                db,
+                id=str(uuid.uuid4()),
+                agent_id=agent_id,
+                session_id=session_id,
+                user_id=None,
+                role="assistant",
+                content=agent_reply,
+            )
 
         # Buscar histórico da sessão
         with get_db_session() as db:
-            res = db.execute(text(
-                """
-                SELECT id, agent_id, session_id, user_id, role, content, created_at
-                FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
-
-            messages = []
-            for r in res:
-                messages.append(ChatMessageModel(
-                    id=r.id,
-                    agent_id=r.agent_id,
-                    session_id=r.session_id,
-                    user_id=r.user_id,
-                    role=r.role,
-                    content=r.content,
-                    created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None)
-                ))
+            res = ChatMessage.get_messages(db, agent_id, session_id, asc=True)
+            messages = [ChatMessageModel(**m.to_dict()) for m in res]
 
         logger.info(f"chat_message agent_id={agent_id} session_id={session_id} len={len(messages)}")
 
@@ -469,9 +398,9 @@ async def chat_with_agent(agent_id: str, chat: ChatRequest):
             agent_id=agent_id,
             session_id=session_id,
             reply=agent_reply,
-            messages=messages
+            messages=messages,
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -483,33 +412,9 @@ async def chat_with_agent(agent_id: str, chat: ChatRequest):
 async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limit: int = 100):
     """Retorna histórico de chat do agente. Se session_id for omitido, retorna últimas mensagens do agente."""
     try:
-        from sqlalchemy import text
-        query = [
-            "SELECT id, agent_id, session_id, user_id, role, content, created_at",
-            "FROM chat_messages",
-            "WHERE agent_id = :agent_id",
-        ]
-        params = {"agent_id": agent_id}
-        if session_id:
-            query.append("AND session_id = :session_id")
-            params["session_id"] = session_id
-        query.append("ORDER BY created_at DESC LIMIT :limit")
-        params["limit"] = limit
-
-        sql = "\n".join(query)
         with get_db_session() as db:
-            res = db.execute(text(sql), params)
-            messages = []
-            for r in res:
-                messages.append(ChatMessageModel(
-                    id=r.id,
-                    agent_id=r.agent_id,
-                    session_id=r.session_id,
-                    user_id=r.user_id,
-                    role=r.role,
-                    content=r.content,
-                    created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None)
-                ))
+            res = ChatMessage.get_messages(db, agent_id, session_id, limit=limit, asc=False)
+            messages = [ChatMessageModel(**m.to_dict()) for m in res]
 
         # Retornar em ordem cronológica
         messages.reverse()
@@ -518,19 +423,17 @@ async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limi
         logger.error(f"Erro ao obter histórico de chat: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao obter histórico: {str(e)}")
 
+
 # Delete SDK Agent
 @app.delete("/api/agents/{agent_id}")
 async def delete_sdk_agent(agent_id: str):
     """Exclui um agente SDK"""
     try:
-        from sqlalchemy import text
         with get_db_session() as db:
-            result = db.execute(text("SELECT id FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
-            
-            if not result.first():
+            agent = Agent.get_by_id(db, agent_id)
+            if not agent:
                 raise HTTPException(status_code=404, detail="Agente não encontrado")
-            
-            db.execute(text("DELETE FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
+            db.delete(agent)
             
         return {"message": "Agente excluído com sucesso", "id": agent_id}
         
@@ -545,26 +448,18 @@ async def delete_sdk_agent(agent_id: str):
 async def get_system_stats():
     """Obtém estatísticas do sistema SDK"""
     try:
-        from sqlalchemy import text
         with get_db_session() as db:
-            total_result = db.execute(text("SELECT COUNT(*) as count FROM agents"))
-            total_agents = total_result.scalar()
-            
-            customer_result = db.execute(text("SELECT COUNT(*) as count FROM agents WHERE specialization = 'customer_service'"))
-            customer_service = customer_result.scalar()
-            
-            scheduling_result = db.execute(text("SELECT COUNT(*) as count FROM agents WHERE specialization = 'scheduling'"))
-            scheduling = scheduling_result.scalar()
-            
-            sales_result = db.execute(text("SELECT COUNT(*) as count FROM agents WHERE specialization = 'sales'"))
-            sales = sales_result.scalar()
-            
-            return {
-                "total_agents": total_agents,
-                "customer_service_agents": customer_service,
-                "scheduling_agents": scheduling,
-                "sales_agents": sales,
-            }
+            total_agents = db.query(Agent).count()
+            customer_service = db.query(Agent).filter(Agent.specialization == "customer_service").count()
+            scheduling = db.query(Agent).filter(Agent.specialization == "scheduling").count()
+            sales = db.query(Agent).filter(Agent.specialization == "sales").count()
+
+        return {
+            "total_agents": total_agents,
+            "customer_service_agents": customer_service,
+            "scheduling_agents": scheduling,
+            "sales_agents": sales,
+        }
         
     except Exception as e:
         logger.error(f"Erro ao obter estatísticas: {str(e)}")
