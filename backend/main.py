@@ -1,7 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
+from jose import JWTError, jwt
 import uuid
 import json
 import os
@@ -62,6 +64,66 @@ class ChatResponse(BaseModel):
     session_id: str
     reply: str
     messages: List[ChatMessageModel]
+
+
+# Security models
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: str
+    role: str
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+SECRET_KEY = config.SECRET_KEY
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Simple user store for demonstration
+fake_users_db = {
+    "admin": {"username": "admin", "password": "admin", "role": "admin"},
+    "user": {"username": "user", "password": "user", "role": "user"},
+}
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def authenticate_user(username: str, password: str):
+    user = fake_users_db.get(username)
+    if not user or user["password"] != password:
+        return None
+    return user
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        role: str = payload.get("role")
+        if username is None or role is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    return TokenData(username=username, role=role)
+
+
+def admin_required(current_user: TokenData = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    return current_user
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -124,9 +186,22 @@ async def health_check():
         logger.error(f"Health check failed: {str(e)}")
         raise HTTPException(status_code=500, detail="System unhealthy")
 
+# OAuth2 token endpoint
+@app.post("/token", response_model=Token)
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["username"], "role": user["role"]},
+        expires_delta=access_token_expires,
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
 # Create SDK Agent
 @app.post("/api/agents", response_model=SDKAgentResponse)
-async def create_sdk_agent(agent_request: SDKAgentRequest):
+async def create_sdk_agent(agent_request: SDKAgentRequest, _: TokenData = Depends(admin_required)):
     """Cria um novo agente SDK especializado"""
     try:
         logger.info(f"Criando agente SDK: {agent_request.name} ({agent_request.specialization})")
@@ -171,7 +246,7 @@ async def create_sdk_agent(agent_request: SDKAgentRequest):
 
 # List SDK Agents
 @app.get("/api/agents")
-async def list_sdk_agents():
+async def list_sdk_agents(_: TokenData = Depends(admin_required)):
     """Lista todos os agentes SDK criados"""
     try:
         from sqlalchemy import text
@@ -201,7 +276,7 @@ async def list_sdk_agents():
 
 # Get SDK Agent by ID
 @app.get("/api/agents/{agent_id}")
-async def get_sdk_agent(agent_id: str):
+async def get_sdk_agent(agent_id: str, _: TokenData = Depends(admin_required)):
     """Obtém detalhes de um agente SDK específico"""
     try:
         from sqlalchemy import text
@@ -378,7 +453,7 @@ async def call_groq_api(messages: List[Dict], model: str) -> str:
 
 
 @app.post("/api/agents/{agent_id}/chat", response_model=ChatResponse)
-async def chat_with_agent(agent_id: str, chat: ChatRequest):
+async def chat_with_agent(agent_id: str, chat: ChatRequest, _: TokenData = Depends(get_current_user)):
     """Envia mensagem ao agente e retorna a resposta com histórico da sessão"""
     try:
         from sqlalchemy import text
@@ -480,7 +555,7 @@ async def chat_with_agent(agent_id: str, chat: ChatRequest):
 
 
 @app.get("/api/agents/{agent_id}/history", response_model=List[ChatMessageModel])
-async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limit: int = 100):
+async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limit: int = 100, _: TokenData = Depends(admin_required)):
     """Retorna histórico de chat do agente. Se session_id for omitido, retorna últimas mensagens do agente."""
     try:
         from sqlalchemy import text
@@ -520,7 +595,7 @@ async def get_chat_history(agent_id: str, session_id: Optional[str] = None, limi
 
 # Delete SDK Agent
 @app.delete("/api/agents/{agent_id}")
-async def delete_sdk_agent(agent_id: str):
+async def delete_sdk_agent(agent_id: str, _: TokenData = Depends(admin_required)):
     """Exclui um agente SDK"""
     try:
         from sqlalchemy import text
@@ -542,7 +617,7 @@ async def delete_sdk_agent(agent_id: str):
 
 # System statistics
 @app.get("/api/stats")
-async def get_system_stats():
+async def get_system_stats(_: TokenData = Depends(admin_required)):
     """Obtém estatísticas do sistema SDK"""
     try:
         from sqlalchemy import text
@@ -619,7 +694,7 @@ calendar_service = None
 email_manager = None
 
 @app.post("/api/integrations/{integration_name}/test")
-async def test_integration(integration_name: str, config: Dict[str, Any]):
+async def test_integration(integration_name: str, config: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Testa uma integração específica"""
     try:
         logger.info(f"Testando integração: {integration_name}")
@@ -646,7 +721,7 @@ async def test_integration(integration_name: str, config: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=f"Erro no teste: {str(e)}")
 
 @app.post("/api/integrations/{integration_name}/config")
-async def save_integration_config(integration_name: str, config: IntegrationConfig):
+async def save_integration_config(integration_name: str, config: IntegrationConfig, _: TokenData = Depends(admin_required)):
     """Salva configuração de uma integração"""
     try:
         logger.info(f"Salvando configuração para integração: {integration_name}")
@@ -666,7 +741,7 @@ async def save_integration_config(integration_name: str, config: IntegrationConf
         raise HTTPException(status_code=500, detail=f"Erro ao salvar configuração: {str(e)}")
 
 @app.get("/api/integrations")
-async def list_integrations():
+async def list_integrations(_: TokenData = Depends(admin_required)):
     """Lista todas as integrações disponíveis e seus status"""
     try:
         integrations = [
@@ -802,7 +877,7 @@ async def simulate_integration_test(integration_name: str, config: Dict[str, Any
 
 # Payment Integration Endpoints
 @app.post("/api/payments/create-link")
-async def create_payment_link(payment_request: PaymentLinkRequest):
+async def create_payment_link(payment_request: PaymentLinkRequest, _: TokenData = Depends(admin_required)):
     """Cria link de pagamento usando Stripe ou Asaas"""
     try:
         # Initialize payment manager if not already done
@@ -839,7 +914,7 @@ async def create_payment_link(payment_request: PaymentLinkRequest):
         raise HTTPException(status_code=500, detail=f"Erro ao criar link de pagamento: {str(e)}")
 
 @app.get("/api/payments/{provider}/{payment_id}/status")
-async def get_payment_status(provider: str, payment_id: str):
+async def get_payment_status(provider: str, payment_id: str, _: TokenData = Depends(admin_required)):
     """Obtém status de pagamento"""
     try:
         global payment_manager
@@ -855,7 +930,7 @@ async def get_payment_status(provider: str, payment_id: str):
 
 # WhatsApp Evolution API Endpoints
 @app.post("/api/whatsapp/create-instance")
-async def create_whatsapp_instance(instance_request: WhatsAppInstanceRequest):
+async def create_whatsapp_instance(instance_request: WhatsAppInstanceRequest, _: TokenData = Depends(admin_required)):
     """Cria instância WhatsApp via Evolution API"""
     try:
         global evolution_service
@@ -876,7 +951,7 @@ async def create_whatsapp_instance(instance_request: WhatsAppInstanceRequest):
         raise HTTPException(status_code=500, detail=f"Erro ao criar instância: {str(e)}")
 
 @app.get("/api/whatsapp/{instance_name}/qr-code")
-async def get_whatsapp_qr_code(instance_name: str):
+async def get_whatsapp_qr_code(instance_name: str, _: TokenData = Depends(admin_required)):
     """Obtém QR Code para conexão WhatsApp"""
     try:
         global evolution_service
@@ -891,7 +966,7 @@ async def get_whatsapp_qr_code(instance_name: str):
         raise HTTPException(status_code=500, detail=f"Erro ao obter QR Code: {str(e)}")
 
 @app.get("/api/whatsapp/{instance_name}/status")
-async def get_whatsapp_instance_status(instance_name: str):
+async def get_whatsapp_instance_status(instance_name: str, _: TokenData = Depends(admin_required)):
     """Obtém status da instância WhatsApp"""
     try:
         global evolution_service
@@ -906,7 +981,7 @@ async def get_whatsapp_instance_status(instance_name: str):
         raise HTTPException(status_code=500, detail=f"Erro ao obter status: {str(e)}")
 
 @app.post("/api/whatsapp/{instance_name}/send-message")
-async def send_whatsapp_message(instance_name: str, message_data: Dict[str, Any]):
+async def send_whatsapp_message(instance_name: str, message_data: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Envia mensagem via WhatsApp"""
     try:
         global evolution_service
@@ -927,7 +1002,7 @@ async def send_whatsapp_message(instance_name: str, message_data: Dict[str, Any]
         raise HTTPException(status_code=500, detail=f"Erro ao enviar mensagem: {str(e)}")
 
 @app.post("/api/whatsapp/{instance_name}/send-payment-link")
-async def send_whatsapp_payment_link(instance_name: str, payment_data: Dict[str, Any]):
+async def send_whatsapp_payment_link(instance_name: str, payment_data: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Envia link de pagamento via WhatsApp"""
     try:
         global evolution_service
@@ -947,7 +1022,7 @@ async def send_whatsapp_payment_link(instance_name: str, payment_data: Dict[str,
         raise HTTPException(status_code=500, detail=f"Erro ao enviar link de pagamento: {str(e)}")
 
 @app.delete("/api/whatsapp/{instance_name}")
-async def delete_whatsapp_instance(instance_name: str):
+async def delete_whatsapp_instance(instance_name: str, _: TokenData = Depends(admin_required)):
     """Deleta instância WhatsApp"""
     try:
         global evolution_service
@@ -962,7 +1037,7 @@ async def delete_whatsapp_instance(instance_name: str):
         raise HTTPException(status_code=500, detail=f"Erro ao deletar instância: {str(e)}")
 
 @app.get("/api/whatsapp/instances")
-async def list_whatsapp_instances():
+async def list_whatsapp_instances(_: TokenData = Depends(admin_required)):
     """Lista todas as instâncias WhatsApp"""
     try:
         global evolution_service
@@ -978,7 +1053,7 @@ async def list_whatsapp_instances():
 
 # Google Calendar Endpoints
 @app.post("/api/calendar/events")
-async def create_calendar_event(event_request: CalendarEventRequest):
+async def create_calendar_event(event_request: CalendarEventRequest, _: TokenData = Depends(admin_required)):
     """Cria evento no Google Calendar"""
     try:
         global calendar_service
@@ -1009,7 +1084,8 @@ async def create_calendar_event(event_request: CalendarEventRequest):
 async def get_calendar_events(
     start_date: str = None,
     end_date: str = None,
-    calendar_id: str = 'primary'
+    calendar_id: str = 'primary',
+    _: TokenData = Depends(admin_required)
 ):
     """Obtém eventos do Google Calendar"""
     try:
@@ -1038,7 +1114,7 @@ async def get_calendar_events(
         raise HTTPException(status_code=500, detail=f"Erro ao obter eventos: {str(e)}")
 
 @app.post("/api/calendar/check-availability")
-async def check_calendar_availability(availability_data: Dict[str, Any]):
+async def check_calendar_availability(availability_data: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Verifica disponibilidade no calendário"""
     try:
         global calendar_service
@@ -1065,7 +1141,8 @@ async def find_available_calendar_slots(
     date: str,
     duration_minutes: int = 60,
     start_hour: str = "09:00",
-    end_hour: str = "17:00"
+    end_hour: str = "17:00",
+    _: TokenData = Depends(admin_required)
 ):
     """Encontra horários disponíveis no calendário"""
     try:
@@ -1090,7 +1167,7 @@ async def find_available_calendar_slots(
 
 # Email Integration Endpoints
 @app.post("/api/email/send")
-async def send_email(email_request: EmailRequest):
+async def send_email(email_request: EmailRequest, _: TokenData = Depends(admin_required)):
     """Envia email via SendGrid ou SMTP"""
     try:
         global email_manager
@@ -1124,7 +1201,7 @@ async def send_email(email_request: EmailRequest):
         raise HTTPException(status_code=500, detail=f"Erro ao enviar email: {str(e)}")
 
 @app.post("/api/email/send-appointment-confirmation")
-async def send_appointment_confirmation_email(notification_data: Dict[str, Any]):
+async def send_appointment_confirmation_email(notification_data: Dict[str, Any], _: TokenData = Depends(admin_required)):
     """Envia confirmação de agendamento por email"""
     try:
         global email_manager
@@ -1146,7 +1223,7 @@ async def send_appointment_confirmation_email(notification_data: Dict[str, Any])
 
 # Integration status endpoint
 @app.get("/api/integrations/status")
-async def get_integrations_status():
+async def get_integrations_status(_: TokenData = Depends(admin_required)):
     """Obtém status de todas as integrações"""
     try:
         status = {
@@ -1181,7 +1258,7 @@ async def get_integrations_status():
 
 @app.get("/api/logs")
 async def get_logs(level: Optional[str] = None, agent_id: Optional[str] = None, session_id: Optional[str] = None,
-                   since: Optional[str] = None, limit: int = 200):
+                   since: Optional[str] = None, limit: int = 200, _: TokenData = Depends(admin_required)):
     """Retorna logs da aplicação a partir de backend/app.log com filtros simples."""
     try:
         log_path = os.path.join(os.path.dirname(__file__), "app.log")
