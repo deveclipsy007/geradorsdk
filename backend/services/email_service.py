@@ -4,7 +4,8 @@ Handles email sending, templates, and delivery tracking
 """
 
 import smtplib
-import requests
+import asyncio
+import aiohttp
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -89,30 +90,29 @@ class SendGridEmailService:
                     "value": content
                 }]
             
-            # Send email
-            response = requests.post(
-                f"{self.base_url}/mail/send",
-                headers=self.headers,
-                json=email_data
-            )
-            
-            if response.status_code == 202:
-                return {
-                    'success': True,
-                    'message': 'Email sent successfully',
-                    'recipients': to_emails,
-                    'subject': subject,
-                    'sent_at': datetime.utcnow().isoformat(),
-                    'provider': 'sendgrid'
-                }
-            else:
-                error_data = response.json() if response.headers.get('content-type') == 'application/json' else {}
-                return {
-                    'success': False,
-                    'error': error_data.get('errors', [{'message': f'HTTP {response.status_code}'}])[0].get('message'),
-                    'status_code': response.status_code,
-                    'provider': 'sendgrid'
-                }
+            # Send email using aiohttp
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.post(
+                    f"{self.base_url}/mail/send",
+                    json=email_data
+                ) as response:
+                    if response.status == 202:
+                        return {
+                            'success': True,
+                            'message': 'Email sent successfully',
+                            'recipients': to_emails,
+                            'subject': subject,
+                            'sent_at': datetime.utcnow().isoformat(),
+                            'provider': 'sendgrid'
+                        }
+                    else:
+                        error_data = await response.json() if response.headers.get('content-type') == 'application/json' else {}
+                        return {
+                            'success': False,
+                            'error': error_data.get('errors', [{'message': f'HTTP {response.status}'}])[0].get('message'),
+                            'status_code': response.status,
+                            'provider': 'sendgrid'
+                        }
                 
         except Exception as e:
             logger.error(f"Error sending email via SendGrid: {str(e)}")
@@ -291,12 +291,15 @@ class SMTPEmailService:
             else:
                 msg.attach(MIMEText(content, 'plain', 'utf-8'))
             
-            # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                if self.use_tls:
-                    server.starttls()
-                server.login(self.username, self.password)
-                server.send_message(msg)
+            # Send email in a thread to avoid blocking
+            def _send():
+                with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                    if self.use_tls:
+                        server.starttls()
+                    server.login(self.username, self.password)
+                    server.send_message(msg)
+
+            await asyncio.to_thread(_send)
             
             return {
                 'success': True,
