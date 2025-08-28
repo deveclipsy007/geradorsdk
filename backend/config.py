@@ -19,7 +19,7 @@ class Config:
     
     # Configurações do Servidor
     HOST = os.getenv("HOST", "0.0.0.0")
-    PORT = int(os.getenv("PORT", "8001"))  # Alinhado com frontend
+    PORT = int(os.getenv("PORT", "8000"))  # Alinhado com frontend
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     
     # Configurações de API Keys

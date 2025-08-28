@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("[INICIO] Iniciando SDK Agentes Especializados...")
     
+    # Initialize database explicitly on startup
     if not init_database():
         logger.error("Falha na inicialização do banco de dados")
         raise RuntimeError("Database initialization failed")
@@ -94,10 +95,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    **config.get_cors_config(),
 )
 
 # Health check endpoint

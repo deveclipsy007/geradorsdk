@@ -226,6 +226,8 @@
     <script src="config.js"></script>
     <script>
         const API_BASE_URL = window.API_BASE_URL || '/api';
+=======
+        const API_BASE_URL = 'http://localhost:8000/api';
         let currentAgentId = null;
         let currentAgentCode = '';
 
@@ -466,7 +468,7 @@
                     displayResult('⚠️ Backend respondeu mas com problema', 'warning');
                 }
             } catch (error) {
-                displayResult('❌ Backend não está respondendo. Verifique se está rodando na porta 8001', 'error');
+                displayResult('❌ Backend não está respondendo. Verifique se está rodando na porta 8000', 'error');
             }
         });
     </script>
