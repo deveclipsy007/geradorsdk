@@ -103,9 +103,10 @@ log_info "Iniciando servidor..."
 echo ""
 echo "=========================================="
 echo -e "   Servidor disponível em:"
-echo -e "   - Interface: ${BLUE}http://localhost:8000/static/index.html${NC}"
-echo -e "   - API Docs:  ${BLUE}http://localhost:8000/docs${NC}"
-echo -e "   - Health:    ${BLUE}http://localhost:8000/health${NC}"
+PORT=${PORT:-8000}
+echo -e "   - Interface: ${BLUE}http://localhost:${PORT}/static/index.html${NC}"
+echo -e "   - API Docs:  ${BLUE}http://localhost:${PORT}/docs${NC}"
+echo -e "   - Health:    ${BLUE}http://localhost:${PORT}/health${NC}"
 echo "=========================================="
 echo ""
 echo "Pressione Ctrl+C para parar o servidor"
@@ -120,6 +121,6 @@ cleanup() {
 trap cleanup INT
 
 # Iniciar servidor
-$PYTHON_CMD main.py
+$PYTHON_CMD -m uvicorn main:app --host 0.0.0.0 --port 8001
 
 log_info "Servidor finalizado."

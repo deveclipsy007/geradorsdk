@@ -3,7 +3,8 @@ Evolution API Service for WhatsApp Integration
 Handles WhatsApp messaging, instance management, and QR code generation
 """
 
-import requests
+import asyncio
+import aiohttp
 import json
 import logging
 import qrcode
@@ -85,28 +86,27 @@ class EvolutionAPIService:
                     "base64": False
                 }
             
-            response = requests.post(
-                f"{self.base_url}/instance/create",
-                headers=self.headers,
-                json=instance_data
-            )
-            
-            if response.status_code in [200, 201]:
-                result = response.json()
-                return {
-                    'success': True,
-                    'instance_name': instance_name,
-                    'instance_data': result,
-                    'message': 'Instance created successfully',
-                    'created_at': datetime.utcnow().isoformat()
-                }
-            else:
-                error_data = response.json() if response.headers.get('content-type') == 'application/json' else {}
-                return {
-                    'success': False,
-                    'error': error_data.get('message', f'HTTP {response.status_code}'),
-                    'status_code': response.status_code
-                }
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.post(
+                    f"{self.base_url}/instance/create",
+                    json=instance_data
+                ) as response:
+                    if response.status in [200, 201]:
+                        result = await response.json()
+                        return {
+                            'success': True,
+                            'instance_name': instance_name,
+                            'instance_data': result,
+                            'message': 'Instance created successfully',
+                            'created_at': datetime.utcnow().isoformat()
+                        }
+                    else:
+                        error_data = await response.json() if response.headers.get('content-type') == 'application/json' else {}
+                        return {
+                            'success': False,
+                            'error': error_data.get('message', f'HTTP {response.status}'),
+                            'status_code': response.status
+                        }
                 
         except Exception as e:
             logger.error(f"Error creating Evolution API instance: {str(e)}")
@@ -126,22 +126,23 @@ class EvolutionAPIService:
             Dict with QR code data
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/instance/connect/{instance_name}",
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(
+                    f"{self.base_url}/instance/connect/{instance_name}"
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                    else:
+                        result = None
+            if result is not None:
                 # Check if QR code is available
                 if result.get('base64'):
                     # Generate QR code image from base64
                     qr_base64 = result['base64']
-                    
+
                     # Also generate a clean QR code image
                     qr_code_image = await self._generate_qr_code_image(result.get('code', ''))
-                    
+
                     return {
                         'success': True,
                         'qr_code_base64': qr_base64,
@@ -160,8 +161,8 @@ class EvolutionAPIService:
             else:
                 return {
                     'success': False,
-                    'error': f'Failed to get QR code: HTTP {response.status_code}',
-                    'status_code': response.status_code
+                    'error': 'Failed to get QR code',
+                    'status_code': 500
                 }
                 
         except Exception as e:
@@ -212,26 +213,25 @@ class EvolutionAPIService:
             Dict with instance status
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/instance/connectionState/{instance_name}",
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return {
-                    'success': True,
-                    'instance_name': instance_name,
-                    'status': result.get('state', 'unknown'),
-                    'connected': result.get('state') == 'open',
-                    'last_update': datetime.utcnow().isoformat()
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Failed to get instance status: HTTP {response.status_code}',
-                    'status_code': response.status_code
-                }
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(
+                    f"{self.base_url}/instance/connectionState/{instance_name}"
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return {
+                            'success': True,
+                            'instance_name': instance_name,
+                            'status': result.get('state', 'unknown'),
+                            'connected': result.get('state') == 'open',
+                            'last_update': datetime.utcnow().isoformat()
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'error': f'Failed to get instance status: HTTP {response.status}',
+                            'status_code': response.status
+                        }
                 
         except Exception as e:
             logger.error(f"Error getting instance status: {str(e)}")
@@ -272,29 +272,28 @@ class EvolutionAPIService:
                 }
             }
             
-            response = requests.post(
-                f"{self.base_url}/message/sendText/{instance_name}",
-                headers=self.headers,
-                json=message_data
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return {
-                    'success': True,
-                    'message_id': result.get('key', {}).get('id'),
-                    'recipient': clean_number,
-                    'message': message,
-                    'sent_at': datetime.utcnow().isoformat(),
-                    'instance_name': instance_name
-                }
-            else:
-                error_data = response.json() if response.headers.get('content-type') == 'application/json' else {}
-                return {
-                    'success': False,
-                    'error': error_data.get('message', f'HTTP {response.status_code}'),
-                    'status_code': response.status_code
-                }
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.post(
+                    f"{self.base_url}/message/sendText/{instance_name}",
+                    json=message_data
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return {
+                            'success': True,
+                            'message_id': result.get('key', {}).get('id'),
+                            'recipient': clean_number,
+                            'message': message,
+                            'sent_at': datetime.utcnow().isoformat(),
+                            'instance_name': instance_name
+                        }
+                    else:
+                        error_data = await response.json() if response.headers.get('content-type') == 'application/json' else {}
+                        return {
+                            'success': False,
+                            'error': error_data.get('message', f'HTTP {response.status}'),
+                            'status_code': response.status
+                        }
                 
         except Exception as e:
             logger.error(f"Error sending message: {str(e)}")
@@ -393,23 +392,22 @@ Clique no link para realizar o pagamento."""
             Dict with deletion result
         """
         try:
-            response = requests.delete(
-                f"{self.base_url}/instance/delete/{instance_name}",
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                return {
-                    'success': True,
-                    'message': f'Instance {instance_name} deleted successfully',
-                    'instance_name': instance_name
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Failed to delete instance: HTTP {response.status_code}',
-                    'status_code': response.status_code
-                }
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.delete(
+                    f"{self.base_url}/instance/delete/{instance_name}"
+                ) as response:
+                    if response.status == 200:
+                        return {
+                            'success': True,
+                            'message': f'Instance {instance_name} deleted successfully',
+                            'instance_name': instance_name
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'error': f'Failed to delete instance: HTTP {response.status}',
+                            'status_code': response.status
+                        }
                 
         except Exception as e:
             logger.error(f"Error deleting instance: {str(e)}")
@@ -426,24 +424,23 @@ Clique no link para realizar o pagamento."""
             Dict with instances list
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/instance/fetchInstances",
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return {
-                    'success': True,
-                    'instances': result.get('instances', []),
-                    'count': len(result.get('instances', []))
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Failed to list instances: HTTP {response.status_code}',
-                    'status_code': response.status_code
-                }
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.get(
+                    f"{self.base_url}/instance/fetchInstances"
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        return {
+                            'success': True,
+                            'instances': result.get('instances', []),
+                            'count': len(result.get('instances', []))
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'error': f'Failed to list instances: HTTP {response.status}',
+                            'status_code': response.status
+                        }
                 
         except Exception as e:
             logger.error(f"Error listing instances: {str(e)}")
@@ -478,26 +475,25 @@ Clique no link para realizar o pagamento."""
                 "base64": False
             }
             
-            response = requests.post(
-                f"{self.base_url}/webhook/set/{instance_name}",
-                headers=self.headers,
-                json=webhook_data
-            )
-            
-            if response.status_code == 200:
-                return {
-                    'success': True,
-                    'message': 'Webhook configured successfully',
-                    'instance_name': instance_name,
-                    'webhook_url': webhook_url,
-                    'events': webhook_events
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Failed to set webhook: HTTP {response.status_code}',
-                    'status_code': response.status_code
-                }
+            async with aiohttp.ClientSession(headers=self.headers) as session:
+                async with session.post(
+                    f"{self.base_url}/webhook/set/{instance_name}",
+                    json=webhook_data
+                ) as response:
+                    if response.status == 200:
+                        return {
+                            'success': True,
+                            'message': 'Webhook configured successfully',
+                            'instance_name': instance_name,
+                            'webhook_url': webhook_url,
+                            'events': webhook_events
+                        }
+                    else:
+                        return {
+                            'success': False,
+                            'error': f'Failed to set webhook: HTTP {response.status}',
+                            'status_code': response.status
+                        }
                 
         except Exception as e:
             logger.error(f"Error setting webhook: {str(e)}")

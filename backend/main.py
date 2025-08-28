@@ -65,8 +65,13 @@ class ChatResponse(BaseModel):
     reply: str
     messages: List[ChatMessageModel]
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
+# Configurar logging utilizando configurações dinâmicas
+log_config = {
+    "level": getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
+}
+if config.LOG_FILE:
+    log_config["filename"] = config.LOG_FILE
+logging.basicConfig(**log_config)
 logger = logging.getLogger(__name__)
 
 def sanitize_input(value: str) -> str:
@@ -82,10 +87,17 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("[INICIO] Iniciando SDK Agentes Especializados...")
     
+    # Initialize database explicitly on startup
     if not init_database():
         logger.error("Falha na inicialização do banco de dados")
         raise RuntimeError("Database initialization failed")
-    
+
+    # Validar chaves de API configuradas
+    api_keys_status = config.validate_api_keys()
+    missing_keys = [k for k, v in api_keys_status.items() if not v]
+    if missing_keys:
+        logger.warning(f"Chaves de API ausentes: {', '.join(missing_keys)}")
+
     logger.info("[OK] Sistema SDK iniciado com sucesso!")
     
     yield
@@ -103,10 +115,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    **config.get_cors_config(),
 )
 
 # Health check endpoint
@@ -297,6 +306,9 @@ Responda de forma natural, útil e consistente com sua especialização. Mantenh
 
 async def call_anthropic_api(messages: List[Dict], model: str) -> str:
     """Chama a API da Anthropic/Claude"""
+    if not config.ANTHROPIC_API_KEY:
+        logger.error("ANTHROPIC_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY não configurada")
     try:
         # Separar system message das outras mensagens
         system_message = ""
@@ -333,6 +345,9 @@ async def call_anthropic_api(messages: List[Dict], model: str) -> str:
 
 async def call_openai_api(messages: List[Dict], model: str) -> str:
     """Chama a API da OpenAI"""
+    if not config.OPENAI_API_KEY:
+        logger.error("OPENAI_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY não configurada")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -358,6 +373,9 @@ async def call_openai_api(messages: List[Dict], model: str) -> str:
 
 async def call_groq_api(messages: List[Dict], model: str) -> str:
     """Chama a API do Groq"""
+    if not config.GROQ_API_KEY:
+        logger.error("GROQ_API_KEY não configurada")
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY não configurada")
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -389,89 +407,103 @@ async def call_groq_api(messages: List[Dict], model: str) -> str:
 @app.post("/api/agents/{agent_id}/chat", response_model=ChatResponse)
 async def chat_with_agent(agent_id: str, chat: ChatRequest):
     """Envia mensagem ao agente e retorna a resposta com histórico da sessão"""
+
     try:
         from sqlalchemy import text
-        # Verificar se o agente existe e buscar suas configurações
         with get_db_session() as db:
-            result = db.execute(text("SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"), {"agent_id": agent_id})
+            # Verificar se o agente existe e buscar suas configurações
+            result = db.execute(
+                text(
+                    "SELECT id, name, model, instructions, specialization, description FROM agents WHERE id = :agent_id"
+                ),
+                {"agent_id": agent_id},
+            )
             agent_data = result.first()
             if not agent_data:
                 raise HTTPException(status_code=404, detail="Agente não encontrado")
 
-        session_id = chat.session_id or str(uuid.uuid4())
+            session_id = chat.session_id or str(uuid.uuid4())
 
-        # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
-        with get_db_session() as db:
-            history_result = db.execute(text(
-                """
-                SELECT role, content FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
-            
+            # Buscar histórico da conversa para contexto (ANTES de adicionar a nova mensagem)
+            history_result = db.execute(
+                text(
+                    """
+                    SELECT role, content FROM chat_messages
+                    WHERE agent_id = :agent_id AND session_id = :session_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"agent_id": agent_id, "session_id": session_id},
+            )
+
             chat_history = []
             for row in history_result:
                 chat_history.append({"role": row.role, "content": row.content})
 
-        # Gerar resposta inteligente do agente usando LLM
-        agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
+            # Gerar resposta inteligente do agente usando LLM
+            agent_reply = await generate_agent_response(agent_data, chat.message, chat_history)
 
-        # Persistir mensagem do usuário
-        with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": chat.user_id,
-                "role": "user",
-                "content": chat.message,
-            })
+            # Persistir mensagens do usuário e do agente em uma transação
+            with db.begin():
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
+                        VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "user_id": chat.user_id,
+                        "role": "user",
+                        "content": chat.message,
+                    },
+                )
+                db.execute(
+                    text(
+                        """
+                        INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
+                        VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
+                        """
+                    ),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "agent_id": agent_id,
+                        "session_id": session_id,
+                        "user_id": None,
+                        "role": "assistant",
+                        "content": agent_reply,
+                    },
+                )
 
-        # Persistir resposta do agente
-        with get_db_session() as db:
-            db.execute(text(
-                """
-                INSERT INTO chat_messages (id, agent_id, session_id, user_id, role, content)
-                VALUES (:id, :agent_id, :session_id, :user_id, :role, :content)
-                """
-            ), {
-                "id": str(uuid.uuid4()),
-                "agent_id": agent_id,
-                "session_id": session_id,
-                "user_id": None,
-                "role": "assistant",
-                "content": agent_reply,
-            })
-
-        # Buscar histórico da sessão
-        with get_db_session() as db:
-            res = db.execute(text(
-                """
-                SELECT id, agent_id, session_id, user_id, role, content, created_at
-                FROM chat_messages
-                WHERE agent_id = :agent_id AND session_id = :session_id
-                ORDER BY created_at ASC
-                """
-            ), {"agent_id": agent_id, "session_id": session_id})
+            # Buscar histórico da sessão
+            res = db.execute(
+                text(
+                    """
+                    SELECT id, agent_id, session_id, user_id, role, content, created_at
+                    FROM chat_messages
+                    WHERE agent_id = :agent_id AND session_id = :session_id
+                    ORDER BY created_at ASC
+                    """
+                ),
+                {"agent_id": agent_id, "session_id": session_id},
+            )
 
             messages = []
             for r in res:
-                messages.append(ChatMessageModel(
-                    id=r.id,
-                    agent_id=r.agent_id,
-                    session_id=r.session_id,
-                    user_id=r.user_id,
-                    role=r.role,
-                    content=r.content,
-                    created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None)
-                ))
-
+                messages.append(
+                    ChatMessageModel(
+                        id=r.id,
+                        agent_id=r.agent_id,
+                        session_id=r.session_id,
+                        user_id=r.user_id,
+                        role=r.role,
+                        content=r.content,
+                        created_at=r.created_at if isinstance(r.created_at, str) else (r.created_at.isoformat() if r.created_at else None),
+                    )
+                )
         logger.info(f"chat_message agent_id={agent_id} session_id={session_id} len={len(messages)}")
 
         return ChatResponse(
@@ -1414,3 +1446,7 @@ class SalesAgent:
         whatsapp_config=agent_request.whatsapp_config,
         scheduling_config=agent_request.scheduling_config,
     )
+=======
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host=config.HOST, port=config.PORT, reload=config.DEBUG)

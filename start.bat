@@ -80,7 +80,7 @@ echo Pressione Ctrl+C para parar o servidor
 echo.
 
 REM Iniciar servidor
-python main.py
+python -m uvicorn main:app --host 0.0.0.0 --port 8001
 
 echo.
 echo [INFO] Servidor finalizado.

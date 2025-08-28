@@ -142,7 +142,18 @@ HOST=0.0.0.0
 PORT=8000
 DEBUG=false
 DATABASE_URL=sqlite:///./agents.db
+# Origens permitidas (separadas por vírgula)
+CORS_ORIGINS=https://seu-dominio.com
 ```
+
+### 🌐 Configuração do Frontend
+
+O frontend obtém a URL da API a partir de `window.API_BASE_URL`. Para personalizar:
+
+1. Copie `frontend/config.example.js` para `frontend/config.js` e ajuste o valor desejado.
+2. Alternativamente, defina a variável de ambiente `API_BASE_URL` antes de executar `start_frontend.sh` ou `start_frontend.bat` e o arquivo será gerado automaticamente.
+
+Se nenhuma configuração for fornecida, o frontend usará o caminho relativo `/api`.
 
 ## ⚡ Execução e Acesso
 
@@ -520,7 +531,7 @@ Veja o arquivo [LICENSE](LICENSE) para detalhes completos.
 
 | Problema | Solução |
 |----------|---------|
-| **Porta em uso** | Altere `PORT=8001` no `.env` |
+| **Porta em uso** | Altere `PORT` no `.env` para uma porta livre |
 | **API Key inválida** | Verifique configuração no `.env` |
 | **Banco não conecta** | Verifique `DATABASE_URL` |
 | **Módulo não encontrado** | Ative ambiente virtual |
