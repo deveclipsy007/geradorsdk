@@ -146,6 +146,15 @@ DATABASE_URL=sqlite:///./agents.db
 CORS_ORIGINS=https://seu-dominio.com
 ```
 
+### 🌐 Configuração do Frontend
+
+O frontend obtém a URL da API a partir de `window.API_BASE_URL`. Para personalizar:
+
+1. Copie `frontend/config.example.js` para `frontend/config.js` e ajuste o valor desejado.
+2. Alternativamente, defina a variável de ambiente `API_BASE_URL` antes de executar `start_frontend.sh` ou `start_frontend.bat` e o arquivo será gerado automaticamente.
+
+Se nenhuma configuração for fornecida, o frontend usará o caminho relativo `/api`.
+
 ## ⚡ Execução e Acesso
 
 ### 🚀 Inicialização

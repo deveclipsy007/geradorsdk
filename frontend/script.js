@@ -1,4 +1,6 @@
 // API Base URL
+const API_BASE_URL = window.API_BASE_URL || '/api';
+=======
 const API_BASE_URL = 'http://localhost:8000/api';
 
 // Configuration constants
