@@ -132,13 +132,13 @@ class Config:
 class DevelopmentConfig(Config):
     DEBUG = True
     DATABASE_ECHO = True
-    LOG_LEVEL = "DEBUG"
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
 
 # Configuração de produção
 class ProductionConfig(Config):
     DEBUG = False
     DATABASE_ECHO = False
-    LOG_LEVEL = "WARNING"
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "WARNING")
     CORS_ORIGINS = ["https://your-domain.com"]
 
 # Configuração de teste
@@ -146,6 +146,7 @@ class TestingConfig(Config):
     DATABASE_URL = "sqlite:///:memory:"
     DEBUG = True
     DATABASE_ECHO = False
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # Determinar configuração atual
 def get_config() -> Config:
