@@ -86,9 +86,10 @@
         <div id="status-result" class="test-result"></div>
     </div>
 
+    <script src="config.js"></script>
     <script>
         // Configurações
-        const API_BASE_URL = 'http://localhost:8001/api';
+        const API_BASE_URL = window.API_BASE_URL || '/api';
 
         // Função utilitária para fetch com timeout
         async function fetchWithTimeout(url, options = {}) {
