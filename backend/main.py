@@ -63,8 +63,13 @@ class ChatResponse(BaseModel):
     reply: str
     messages: List[ChatMessageModel]
 
-# Configurar logging
-logging.basicConfig(level=logging.INFO)
+# Configurar logging utilizando configurações dinâmicas
+log_config = {
+    "level": getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
+}
+if config.LOG_FILE:
+    log_config["filename"] = config.LOG_FILE
+logging.basicConfig(**log_config)
 logger = logging.getLogger(__name__)
 
 # Lifespan events
