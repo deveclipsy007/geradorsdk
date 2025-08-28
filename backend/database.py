@@ -177,7 +177,3 @@ def init_database():
     except Exception as e:
         print(f"[ERRO] Erro ao inicializar banco de dados: {str(e)}")
         return False
-
-# Auto-inicialização quando o módulo é importado
-if __name__ != "__main__":
-    init_database()
