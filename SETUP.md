@@ -99,7 +99,7 @@ python main.py
 
 ```bash
 cd backend
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ### Método 3: Script de Inicialização
@@ -117,10 +117,10 @@ chmod +x start.sh
 
 Após iniciar o servidor:
 
-- **Interface Web**: http://localhost:8000/static/index.html
-- **API Documentation**: http://localhost:8000/docs
-- **API Redoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
+- **Interface Web**: http://localhost:8005
+- **API Documentation**: http://localhost:8001/docs
+- **API Redoc**: http://localhost:8001/redoc
+- **Health Check**: http://localhost:8001/api/health
 
 ## 🔧 Configurações Avançadas
 
@@ -156,7 +156,7 @@ MAX_CHAT_HISTORY=100      # Máximo de mensagens por sessão
 ### 1. Teste de Conectividade
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8001/api/health
 ```
 
 Resposta esperada:
@@ -174,12 +174,12 @@ Resposta esperada:
 ### 2. Teste das API Keys
 
 ```bash
-curl http://localhost:8000/api/system/stats
+# (Opcional) Outros testes dependem de implementação específica
 ```
 
 ### 3. Teste da Interface
 
-Acesse http://localhost:8000/static/index.html e verifique se:
+Acesse http://localhost:8005 e verifique se:
 - ✅ Interface carrega sem erros
 - ✅ É possível criar um agente
 - ✅ Lista de agentes funciona
@@ -204,7 +204,7 @@ Verifique se pelo menos uma chave está configurada no `.env`:
 
 ```bash
 # Verifique as configurações
-curl http://localhost:8000/api/config
+# (Removido) Endpoint de configuração não estático
 ```
 
 ### Erro de Banco de Dados

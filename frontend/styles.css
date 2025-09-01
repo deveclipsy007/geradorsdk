@@ -717,6 +717,38 @@ input:checked + .slider:before {
     box-shadow: var(--shadow-sm);
 }
 
+.btn-success {
+    background: var(--color-accent-green);
+    color: white;
+    box-shadow: var(--shadow-md);
+    padding: var(--spacing-md) var(--spacing-xl);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    font-family: var(--font-family);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: var(--blur-sm);
+    -webkit-backdrop-filter: var(--blur-sm);
+}
+
+.btn-success:hover {
+    background: #28a745;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-success:active {
+    transform: translateY(0);
+}
+
 .form-actions {
     display: flex;
     gap: var(--spacing-md);
@@ -1522,4 +1554,597 @@ input:checked + .slider:before {
 .error-actions button:hover {
     background: var(--color-surface-elevated);
     border-color: var(--color-border-strong);
+}
+
+/* WhatsApp Integration Styles */
+.whatsapp-connection-panel {
+    padding: 1.5rem;
+    background: rgba(37, 211, 102, 0.05);
+    border: 1px solid rgba(37, 211, 102, 0.2);
+    border-radius: 12px;
+    margin-bottom: 1rem;
+}
+
+.connection-info {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.connection-info h5 {
+    color: #25D366;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.connection-info p {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+}
+
+.instance-info {
+    margin-bottom: 1.5rem;
+}
+
+.instance-info label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--color-text);
+}
+
+.instance-info input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface-elevated);
+    color: var(--color-text);
+    font-family: 'Courier New', monospace;
+}
+
+.instance-info small {
+    color: var(--color-text-secondary);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: var(--color-surface);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #6B7280;
+    position: relative;
+}
+
+.status-indicator.connecting {
+    background: #F59E0B;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.connected {
+    background: #10B981;
+}
+
+.status-indicator.disconnected {
+    background: #EF4444;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.status-text {
+    font-weight: 500;
+    color: var(--color-text);
+}
+
+.whatsapp-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.whatsapp-actions button {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.whatsapp-actions .btn-primary {
+    background: #25D366;
+    color: white;
+    border: none;
+}
+
+.whatsapp-actions .btn-primary:hover:not(:disabled) {
+    background: #20B75C;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+}
+
+.whatsapp-actions .btn-secondary {
+    background: var(--color-surface-elevated);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.whatsapp-actions .btn-secondary:hover:not(:disabled) {
+    background: var(--color-surface);
+    border-color: var(--color-border-strong);
+}
+
+.whatsapp-actions button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.modal-content {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.agent-details-modal {
+    width: 800px;
+}
+
+.edit-agent-modal {
+    width: 700px;
+}
+
+.integrations-modal {
+    width: 900px;
+}
+
+.delete-confirmation-modal {
+    width: 550px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-elevated);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background: var(--color-surface-glass);
+    color: var(--color-text-primary);
+}
+
+.modal-body {
+    padding: var(--spacing-lg);
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-surface-elevated);
+}
+
+/* Agent Details Modal */
+.agent-info-grid {
+    display: grid;
+    gap: var(--spacing-lg);
+}
+
+.info-section {
+    padding: var(--spacing-md);
+    background: var(--color-surface-glass);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.info-section h4 {
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--color-text-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.info-item label {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.info-item span {
+    color: var(--color-text-primary);
+}
+
+.agent-description-text {
+    color: var(--color-text-primary);
+    line-height: 1.6;
+    margin: 0;
+}
+
+.agent-instructions {
+    background: var(--color-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-md);
+    color: var(--color-text-primary);
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    margin: 0;
+}
+
+.integrations-status {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.integration-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.integration-label {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.integration-status.enabled {
+    color: var(--color-accent-green);
+}
+
+.integration-status.disabled {
+    color: var(--color-accent-red);
+}
+
+/* Edit Agent Modal */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.form-group label {
+    color: var(--color-text-primary);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    background: var(--color-surface-glass);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-primary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--color-accent-blue);
+    background: var(--color-surface);
+}
+
+.char-counter {
+    text-align: right;
+    color: var(--color-text-tertiary);
+    font-size: 0.8rem;
+}
+
+/* Integrations Modal */
+.integrations-grid {
+    display: grid;
+    gap: var(--spacing-lg);
+}
+
+.integration-section {
+    background: var(--color-surface-glass);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+}
+
+.integration-section h4 {
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--color-text-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.integration-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.status-label {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.status-indicator {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.status-indicator.active {
+    background: rgba(48, 209, 88, 0.2);
+    color: var(--color-accent-green);
+}
+
+.status-indicator.inactive {
+    background: rgba(255, 69, 58, 0.2);
+    color: var(--color-accent-red);
+}
+
+.status-badge {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.status-badge.created {
+    background: rgba(48, 209, 88, 0.2);
+    color: var(--color-accent-green);
+}
+
+.status-badge.active {
+    background: rgba(0, 122, 255, 0.2);
+    color: var(--color-accent-blue);
+}
+
+/* Button Styles for Modals */
+.btn-cancel {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-cancel:hover {
+    background: var(--color-surface-glass);
+    color: var(--color-text-primary);
+    border-color: var(--color-border-strong);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Delete Confirmation Modal Styles */
+.delete-warning {
+    text-align: left;
+}
+
+.delete-warning > p:first-child {
+    font-size: 1.1rem;
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-lg);
+}
+
+.warning-details {
+    background: rgba(255, 149, 0, 0.1);
+    border: 1px solid rgba(255, 149, 0, 0.3);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-md);
+    margin: var(--spacing-md) 0;
+}
+
+.warning-details p {
+    margin: 0 0 var(--spacing-sm) 0;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.warning-details ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.warning-details li {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
+    color: var(--color-text-secondary);
+}
+
+.warning-details li i {
+    width: 16px;
+    color: var(--color-accent-orange);
+}
+
+.danger-notice {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    background: rgba(255, 69, 58, 0.1);
+    border: 1px solid rgba(255, 69, 58, 0.3);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
+.danger-notice i {
+    color: var(--color-accent-red);
+    font-size: 1.1rem;
+}
+
+.danger-notice span {
+    color: var(--color-accent-red);
+    font-weight: 600;
+}
+
+.delete-confirm-btn {
+    background: var(--color-accent-red);
+    color: white;
+    border: 1px solid var(--color-accent-red);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.delete-confirm-btn:hover:not(:disabled) {
+    background: #e63946;
+    border-color: #e63946;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 69, 58, 0.3);
+}
+
+.delete-confirm-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.delete-confirm-btn .fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+/* Modal Responsive Design */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95vw;
+        max-height: 95vh;
+    }
+    
+    .agent-details-modal,
+    .edit-agent-modal,
+    .integrations-modal,
+    .delete-confirmation-modal {
+        width: 95vw;
+    }
+    
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .modal-footer {
+        flex-direction: column;
+    }
+    
+    .integrations-grid {
+        grid-template-columns: 1fr;
+    }
 }

@@ -12,7 +12,13 @@ import json
 import uuid
 from contextlib import contextmanager
 
-from config import config
+try:
+    from backend.config import config
+except Exception:
+    try:
+        from .config import config
+    except Exception:
+        from config import config
 
 # Base para modelos
 Base = declarative_base()
@@ -39,8 +45,9 @@ class Agent(Base):
     instructions = Column(Text, nullable=False)
     
     # Configurações de integração
-    whatsapp_config = Column(JSON, default=dict)  # WhatsApp integration settings
-    scheduling_config = Column(JSON, default=dict)  # Scheduling platform settings
+    # Armazenar como TEXT (JSON serializado) para compatibilidade com testes que usam json.loads
+    whatsapp_config = Column(Text, default="{}")
+    scheduling_config = Column(Text, default="{}")
     
     status = Column(String(50), default="created")
     
@@ -106,6 +113,38 @@ class ChatMessage(Base):
             "role": self.role,
             "content": self.content,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class WhatsAppInstance(Base):
+    """Instâncias WhatsApp via Evolution API"""
+    __tablename__ = "whatsapp_instances"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    instance_name = Column(String(255), nullable=False, unique=True, index=True)
+    agent_id = Column(String, ForeignKey("agents.id"), nullable=True)
+    connection_state = Column(String(50), default="disconnected")  # 'open', 'close', 'connecting'
+    connected = Column(Boolean, default=False)
+    webhook_url = Column(String(500), nullable=True)
+    qr_code = Column(Text, nullable=True)  # Base64 QR code when available
+    
+    # Metadados
+    created_at = Column(DateTime, server_default=func.now())
+    last_update = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relacionamento com agente
+    agent = relationship("Agent")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "instance_name": self.instance_name,
+            "agent_id": self.agent_id,
+            "connection_state": self.connection_state,
+            "connected": self.connected,
+            "webhook_url": self.webhook_url,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_update": self.last_update.isoformat() if self.last_update else None,
         }
 
 

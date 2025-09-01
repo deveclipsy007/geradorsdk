@@ -71,9 +71,10 @@ echo [INFO] Iniciando servidor...
 echo.
 echo ==========================================
 echo   Servidor disponível em:
-echo   - Interface: http://localhost:8000/static/index.html
-echo   - API Docs:  http://localhost:8000/docs  
-echo   - Health:    http://localhost:8000/health
+echo   - Interface (Frontend): http://localhost:8005
+echo   - Interface (Fallback): http://localhost:8001/static/index.html
+echo   - API Docs:            http://localhost:8001/docs  
+echo   - Health:              http://localhost:8001/api/health
 echo ==========================================
 echo.
 echo Pressione Ctrl+C para parar o servidor

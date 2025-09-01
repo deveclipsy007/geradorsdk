@@ -16,7 +16,7 @@ Sistema enterprise para criação, gerenciamento e execução de agentes intelig
 - **Múltiplos Modelos**: Claude 3, GPT-4, Llama 3, Mixtral via Groq
 
 ### 🔌 **Integrações Empresariais**
-- **WhatsApp Business**: Evolution API para automação completa
+- **WhatsApp Business**: Evolution API v2.2.3 para automação completa
 - **Google Calendar**: Agendamento inteligente e gestão de eventos
 - **E-mail**: Envio automatizado via SMTP e templates
 - **Pagamentos**: Stripe e Asaas para processamento de transações
@@ -44,7 +44,7 @@ gerador-de-agentes-sdk/
 │   ├── database.py                # 🗄️ Modelos SQLAlchemy e ORM
 │   ├── models.py                  # 📋 Schemas Pydantic para validação
 │   └── services/                  # 🏗️ Serviços especializados
-│       ├── evolution_api_service.py # 📱 Integração WhatsApp
+│       ├── evolution_api_service.py # 📱 Integração WhatsApp v2.2.3
 │       ├── calendar_service.py    # 📅 Google Calendar API
 │       ├── email_service.py       # 📧 Envio de e-mails
 │       └── payment_service.py     # 💳 Stripe & Asaas
@@ -72,6 +72,7 @@ gerador-de-agentes-sdk/
 | **Python** | 3.8+ | Runtime principal (recomendado: 3.10+) |
 | **pip/uv** | Latest | Gerenciador de pacotes Python |
 | **API Keys** | - | Pelo menos uma chave de IA necessária |
+| **Evolution API** | v2.2.3 | Acesso ao servidor remoto para WhatsApp |
 
 ### ⚡ Instalação Rápida
 
@@ -100,6 +101,11 @@ venv\Scripts\activate     # Windows
 
 # 3. Instale dependências
 pip install -r requirements.txt
+# (Opcional) Ferramentas de desenvolvimento
+pip install -r requirements-dev.txt
+
+# (Opcional) Setup rápido de dev via Makefile
+make dev-setup
 
 # 4. Configure ambiente
 cp .env.example .env
@@ -120,9 +126,11 @@ OPENAI_API_KEY=sk-proj-xxxxx                # GPT-4/3.5
 GROQ_API_KEY=gsk_xxxxx                      # Llama 3/Mixtral
 
 # === INTEGRAÇÕES EMPRESARIAIS ===
-# WhatsApp (Evolution API)
-EVOLUTION_API_URL=https://api.evolution.com
+# WhatsApp (Evolution API v2.2.3 - Servidor Remoto)
+EVOLUTION_API_URL=https://evolution.agentecortex.com
 EVOLUTION_API_KEY=your-evolution-key
+EVOLUTION_API_VERSION=2.2.3
+EVOLUTION_WEBHOOK_URL=http://localhost:8001/api/whatsapp/webhook
 
 # Google Calendar
 GOOGLE_CALENDAR_CREDENTIALS=path/to/credentials.json
@@ -139,7 +147,7 @@ ASAAS_API_KEY=your-asaas-key
 
 # === CONFIGURAÇÕES DO SISTEMA ===
 HOST=0.0.0.0
-PORT=8000
+PORT=8001
 DEBUG=false
 DATABASE_URL=sqlite:///./agents.db
 ```
@@ -160,18 +168,16 @@ cd backend
 python main.py
 
 # Método 3: Uvicorn (produção)
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ### 🌐 Endpoints Disponíveis
 
 | Serviço | URL | Descrição |
 |---------|-----|------------|
-| **🎨 Interface Principal** | http://localhost:8000/static/index.html | SPA moderna e responsiva |
-| **📚 Documentação API** | http://localhost:8000/docs | Swagger/OpenAPI interativo |
-| **❤️ Health Check** | http://localhost:8000/health | Monitor de saúde do sistema |
-| **📊 Estatísticas** | http://localhost:8000/api/system/stats | Métricas em tempo real |
-| **⚙️ Configurações** | http://localhost:8000/api/config | Configurações ativas |
+| **🎨 Interface Principal** | http://localhost:8005 | SPA moderna e responsiva |
+| **📚 Documentação API** | http://localhost:8001/docs | Swagger/OpenAPI interativo |
+| **❤️ Health Check** | http://localhost:8001/api/health | Monitor de saúde do sistema |
 
 ## 📖 Guia de Uso
 
@@ -191,13 +197,13 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 #### **Via API**
 
 ```bash
-curl -X POST "http://localhost:8000/api/agents/sdk/create" \
+curl -X POST "http://localhost:8001/api/agents" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Assistente de Vendas",
     "specialization": "sales",
     "description": "Agente para automatizar vendas via WhatsApp",
-    "model": "claude-3-sonnet-20240229",
+    "model": "claude-3-5-sonnet-20241022",
     "instructions": "Você é um vendedor especializado...",
     "whatsapp_config": {
       "instance_name": "vendas01"
@@ -493,6 +499,39 @@ Este projeto está licenciado sob a **MIT License**.
 - 📋 Incluir licença e copyright
 
 Veja o arquivo [LICENSE](LICENSE) para detalhes completos.
+
+## 🔄 Migração Evolution API v2.2.3
+
+### 📋 Mudanças Principais
+
+- **✅ Servidor Remoto**: Evolution API agora roda em servidor dedicado
+- **✅ Versão v2.2.3**: Compatibilidade com a versão mais recente
+- **✅ Configuração Simplificada**: Apenas URL e API Key necessários
+- **✅ Performance Melhorada**: Sem overhead de containers locais
+
+### 🔧 Configuração Atualizada
+
+```env
+# Evolution API v2.2.3 (Servidor Remoto)
+EVOLUTION_API_URL=https://evolution.agentecortex.com
+EVOLUTION_API_KEY=sua_chave_api_evolution
+EVOLUTION_API_VERSION=2.2.3
+```
+
+### 🚀 Benefícios da Migração
+
+- **🔧 Manutenção Reduzida**: Sem necessidade de gerenciar containers locais
+- **⚡ Performance**: Servidor dedicado otimizado
+- **🔄 Atualizações Automáticas**: Sempre na versão mais recente
+- **🛡️ Segurança**: Infraestrutura gerenciada profissionalmente
+- **📊 Monitoramento**: Logs e métricas centralizados
+
+### ⚠️ Notas Importantes
+
+- **API Key**: Solicite sua chave de acesso ao administrador do sistema
+- **Webhook**: Configure o webhook URL para receber eventos
+- **Compatibilidade**: Totalmente compatível com versões anteriores
+- **Suporte**: Documentação completa da API v2.2.3 disponível
 
 ## 🌟 Roadmap
 

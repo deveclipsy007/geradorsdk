@@ -1,0 +1,490 @@
+{
+  "meta": {
+    "name": "stk-agent-generator",
+    "codename": "LUT-STK",
+    "description": "Gerador de Agentes STK (único propósito): cria, versiona e empacota agentes prontos para operação usando Agno + OCM (by Drizzy) como orquestrador de pipelines/manifests.",
+    "owner": "Gambit Group",
+    "version": "1.0.0",
+    "stack": {
+      "frontend": "Vanilla HTML/CSS/JS (iOS-like, dark/gray)",
+      "backend": "FastAPI + Agno (Python 3.11+)",
+      "orchestrator": "OCM (Drizzy)",
+      "db": ["SQLite (dev/edge)", "PostgreSQL (staging/prod)"],
+      "cache": "Redis",
+      "vector": ["sqlite-vss (local)", "pgvector/Qdrant (cloud)"],
+      "auth": "JWT (OAuth2 Password)",
+      "realtime": "WebSockets",
+      "observability": "OpenTelemetry + Prometheus + Grafana"
+    }
+  },
+  "monorepo": {
+    "root_dirs": [
+      "backend",
+      "frontend",
+      "ocm",
+      "templates",
+      "manifests",
+      "seeds",
+      "scripts",
+      "tests",
+      "docs",
+      "ops"
+    ],
+    "conventions": {
+      "code_style": "Black/Flake8/isort (Python); Prettier/ESLint (JS)",
+      "commits": "Conventional Commits",
+      "branching": "trunk-based",
+      "semver": true
+    }
+  },
+  "orchestration": {
+    "engine": "OCM",
+    "vendor": "Drizzy",
+    "manifests_dir": "manifests",
+    "pipelines_dir": "ocm/pipelines",
+    "secrets": {
+      "provider": "env",
+      "keys": ["EVOLUTION_API_KEY", "JWT_SECRET", "DATABASE_URL", "REDIS_URL", "VECTOR_DB_URL"]
+    },
+    "pipelines": [
+      {
+        "id": "pipeline.stk.build",
+        "triggers": ["api:/stk/generate", "cli:ocm run pipeline.stk.build"],
+        "stages": [
+          "validate_blueprint",
+          "hydrate_templates",
+          "generate_agent_sdk",
+          "wire_integrations",
+          "generate_rag_index",
+          "package_artifacts",
+          "publish_registry"
+        ],
+        "artifacts": [
+          "dist/{agent_slug}/sdk.zip",
+          "dist/{agent_slug}/Dockerfile",
+          "dist/{agent_slug}/README.md",
+          "dist/{agent_slug}/manifest.ocm.yaml"
+        ]
+      },
+      {
+        "id": "pipeline.stk.update-index",
+        "triggers": ["api:/stk/{agent_id}/knowledge/index", "cron:nightly"],
+        "stages": ["chunk_sources", "embed_chunks", "update_vector_store"]
+      }
+    ],
+    "registry": {
+      "type": "filesystem",
+      "path": "dist/registry",
+      "index": "dist/registry/index.json"
+    },
+    "manifests": {
+      "agent_ocm_schema": "1.0",
+      "example": "manifests/examples/agent.ocm.yaml",
+      "fields": [
+        "name",
+        "slug",
+        "version",
+        "runtime: agno@py311",
+        "tools:http/python",
+        "channels:[chat,whatsapp,email]",
+        "memory:{short_term,long_term,vector}",
+        "rag:{index,retrieval}",
+        "policies:{rate_limits,telemetry,pii}"
+      ]
+    }
+  },
+  "backend": {
+    "runtime": "Python 3.11",
+    "entrypoints": {
+      "app": "backend/main.py",
+      "asgi": "uvicorn backend.main:app --reload"
+    },
+    "modules": {
+      "api": {
+        "prefix": "/api",
+        "endpoints": [
+          { "method": "POST", "path": "/auth/login", "desc": "Login (JWT)" },
+          { "method": "POST", "path": "/auth/refresh", "desc": "Refresh token" },
+          { "method": "GET", "path": "/health", "desc": "Healthcheck" },
+          { "method": "GET", "path": "/metrics", "desc": "Prometheus metrics" },
+
+          { "method": "POST", "path": "/stk/generate", "desc": "Gera agente STK a partir de blueprint (aciona OCM)" },
+          { "method": "GET", "path": "/stk", "desc": "Lista agentes STK gerados" },
+          { "method": "GET", "path": "/stk/{agent_id}", "desc": "Detalha agente STK" },
+          { "method": "PATCH", "path": "/stk/{agent_id}", "desc": "Atualiza metadados/config do agente STK" },
+          { "method": "DELETE", "path": "/stk/{agent_id}", "desc": "Remove/arquiva agente STK" },
+
+          { "method": "POST", "path": "/stk/{agent_id}/run", "desc": "Executa ação/tool (sandbox exec)" },
+          { "method": "POST", "path": "/stk/{agent_id}/chat", "desc": "Chat de teste (loopback)" },
+          { "method": "GET", "path": "/stk/{agent_id}/history", "desc": "Histórico do chat de teste" },
+
+          { "method": "POST", "path": "/stk/{agent_id}/knowledge/upload", "desc": "Upload de fontes (PDF/MD/URL)" },
+          { "method": "POST", "path": "/stk/{agent_id}/knowledge/index", "desc": "Indexa conteúdo no vector store via OCM" },
+
+          { "method": "POST", "path": "/integrations/evolution/connect", "desc": "Conecta instância WhatsApp (Evolution API)" },
+          { "method": "POST", "path": "/integrations/evolution/webhook", "desc": "Webhook de eventos (mensagens, status)" },
+
+          { "method": "GET", "path": "/logs", "desc": "Logs da aplicação" }
+        ]
+      },
+      "stk_generator": {
+        "schemas": {
+          "stk_blueprint": {
+            "id": "string",
+            "name": "string",
+            "slug": "kebab-case",
+            "version": "semver",
+            "persona": {
+              "role": "string",
+              "tone": "string",
+              "goals": ["string"],
+              "constraints": ["string"]
+            },
+            "skills": ["string"],
+            "tools": [
+              {
+                "name": "string",
+                "kind": "builtin|http|python",
+                "config": { "any": "object" },
+                "permissions": ["read|write|execute"]
+              }
+            ],
+            "channels": ["chat", "whatsapp", "email"],
+            "memory": {
+              "short_term": { "window": 50 },
+              "long_term": { "enabled": true },
+              "vector": { "collection": "string", "top_k": 8 }
+            },
+            "rag": {
+              "index": "knowledge.chunks",
+              "retrieval": { "strategy": "hybrid", "k": 6 },
+              "chunking": { "size": 1200, "overlap": 120 }
+            },
+            "policies": { "rate_limit_rpm": 60, "allow_external_http": true },
+            "observability": { "log_inputs": true, "log_outputs": true }
+          }
+        },
+        "flows": [
+          "validate_blueprint",
+          "emit_ocm_manifest",
+          "hydrate_templates",
+          "compile_agent (Agno runtime)",
+          "wire_integrations (Evolution, Email)",
+          "prepare_rag",
+          "package_artifacts",
+          "register_artifacts"
+        ],
+        "outputs": [
+          "sdk.zip (src/agent/*, tools/*, config/*)",
+          "Dockerfile",
+          "README.md (uso e deploy)",
+          "manifest.ocm.yaml"
+        ]
+      },
+      "integrations": {
+        "evolution_api": {
+          "base_url": "https://<seu-dominio>",
+          "env_keys": [
+            "EVOLUTION_API_KEY",
+            "EVOLUTION_SERVER_URL",
+            "EVOLUTION_DATABASE_URL",
+            "EVOLUTION_QR_LIMIT"
+          ],
+          "webhook": {
+            "path": "/api/integrations/evolution/webhook",
+            "events": ["message.received", "message.sent", "status.update"]
+          },
+          "instance_model": {
+            "fields": ["id", "name", "phone", "status", "last_qr", "connected_at"]
+          }
+        },
+        "email": {
+          "providers": ["SendGrid", "SMTP"],
+          "use_cases": ["notificacoes", "verificacao", "recuperacao_senha"]
+        }
+      },
+      "security": {
+        "auth": "JWT/OAuth2 Password Flow",
+        "rbac": ["owner", "admin", "editor", "viewer"],
+        "rate_limit": { "global_rps": 50, "per_user_rpm": 600 },
+        "cors": ["https://app.local", "https://app.prod"],
+        "headers": ["X-Request-Id", "X-Trace-Id"],
+        "owasp": ["ASVS", "XSS", "CSRF (forms)", "SQLi prevention", "Secrets rotation"]
+      },
+      "storage": {
+        "db_engines": { "preferred": "postgres", "supported": ["sqlite", "postgres"] },
+        "sqlite": {
+          "file": "var/data/stk.db",
+          "driver": "sqlite+aiosqlite",
+          "sqlalchemy": {
+            "echo": false,
+            "connect_args": { "check_same_thread": false },
+            "poolclass": "StaticPool"
+          },
+          "pragmas_on_connect": [
+            "PRAGMA journal_mode=WAL;",
+            "PRAGMA synchronous=NORMAL;",
+            "PRAGMA foreign_keys=ON;",
+            "PRAGMA temp_store=MEMORY;",
+            "PRAGMA mmap_size=30000000000;",
+            "PRAGMA cache_size=-262144;",
+            "PRAGMA page_size=4096;",
+            "PRAGMA wal_autocheckpoint=1000;",
+            "PRAGMA journal_size_limit=67108864;"
+          ],
+          "maintenance_jobs": ["VACUUM (ANALYZE);", "PRAGMA optimize;"],
+          "fts": {
+            "enabled": true,
+            "engine": "FTS5",
+            "tables": [
+              { "name": "messages_fts", "content_table": "core.messages", "columns": ["text", "role", "agent_id"] },
+              { "name": "chunks_fts", "content_table": "knowledge.chunks", "columns": ["text", "source_id", "tags"] }
+            ],
+            "tokenizer": "unicode61"
+          },
+          "vector": {
+            "enabled": true,
+            "driver": "sqlite-vss",
+            "index_table": "knowledge.vectors",
+            "dims": 1536,
+            "metric": "cosine"
+          },
+          "backup": { "strategy": "snapshot+WAL-archive", "tools": ["litestream (opcional)"], "retention_days": 7 }
+        },
+        "postgres": {
+          "driver": "postgresql+asyncpg",
+          "extensions": ["pg_trgm", "pgvector"],
+          "pool": { "min": 2, "max": 15, "timeout_sec": 30 }
+        },
+        "postgres_schema": [
+          {
+            "name": "core",
+            "tables": [
+              { "name": "users", "pk": "id" },
+              { "name": "teams", "pk": "id" },
+              { "name": "memberships", "pk": "id" },
+              { "name": "stk_agents", "pk": "id" },
+              { "name": "stk_agent_versions", "pk": "id" },
+              { "name": "agent_runs", "pk": "id" },
+              { "name": "messages", "pk": "id" },
+              { "name": "tools", "pk": "id" },
+              { "name": "integrations", "pk": "id" },
+              { "name": "feature_flags", "pk": "key" },
+              { "name": "audit_logs", "pk": "id" }
+            ]
+          },
+          {
+            "name": "knowledge",
+            "tables": [
+              { "name": "sources", "pk": "id" },
+              { "name": "chunks", "pk": "id", "vector": true },
+              { "name": "indexes", "pk": "id" }
+            ]
+          }
+        ],
+        "redis": { "uses": ["sessions", "rate_limit", "short_term_memory", "task_queue"] },
+        "files": { "provider": "local_or_s3", "buckets": ["uploads", "exports", "logs"] }
+      },
+      "workers": {
+        "queue": "redis",
+        "jobs": [
+          "index_knowledge",
+          "send_whatsapp_message",
+          "sync_evolution_instance",
+          "agent_background_task",
+          "nightly_reindex"
+        ],
+        "retries": 3,
+        "dead_letter": "queue:dlq"
+      },
+      "observability": {
+        "logging": { "level": "INFO", "sink": ["stdout", "file:app.log"], "json": true, "trace_id": true },
+        "metrics": ["http_requests_total", "task_duration_seconds", "agent_tokens_used", "ocm_pipeline_duration_seconds"],
+        "tracing": { "otel": true, "exporters": ["otlp"] }
+      },
+      "configs": {
+        "env": [
+          "APP_ENV",
+          "DB_ENGINE",
+          "SQLITE_PATH",
+          "DATABASE_URL",
+          "REDIS_URL",
+          "JWT_SECRET",
+          "VECTOR_DB_URL",
+          "ALLOWED_ORIGINS"
+        ],
+        "env_defaults": {
+          "local": { "DB_ENGINE": "sqlite", "SQLITE_PATH": "var/data/stk.db" },
+          "edge": { "DB_ENGINE": "sqlite" },
+          "staging": { "DB_ENGINE": "postgres" },
+          "prod": { "DB_ENGINE": "postgres" }
+        },
+        "feature_flags": {
+          "use_sqlite_vector": true,
+          "use_pgvector": false,
+          "enable_realtime_ws": true,
+          "enable_agent_auto_refine": true
+        }
+      }
+    }
+  },
+  "agents": {
+    "scope": "Somente geração STK (sem catálogo de agentes prontos).",
+    "blueprint_schema_ref": "backend.modules.stk_generator.schemas.stk_blueprint",
+    "templates": {
+      "minimal": {
+        "name": "Novo Agente STK",
+        "persona": { "role": "Especialista", "tone": "profissional", "goals": ["resolver problemas"], "constraints": ["clareza"] },
+        "skills": ["comunicar", "pesquisar"],
+        "tools": [],
+        "channels": ["chat"],
+        "memory": { "short_term": { "window": 30 }, "long_term": { "enabled": true }, "vector": { "collection": "default", "top_k": 6 } },
+        "rag": { "index": "knowledge.chunks", "retrieval": { "strategy": "hybrid", "k": 6 } },
+        "policies": { "rate_limit_rpm": 30, "allow_external_http": false }
+      }
+    }
+  },
+  "frontend": {
+    "entrypoint": "frontend/index.html",
+    "routes": [
+      { "path": "/", "name": "Dashboard" },
+      { "path": "/dicas", "name": "Dicas (onboarding)" },
+      { "path": "/stk/novo", "name": "Criar Agente STK" },
+      { "path": "/stk", "name": "Meus Agentes STK" },
+      { "path": "/chat", "name": "Chat de Teste" },
+      { "path": "/config", "name": "Configurações" },
+      { "path": "/logs", "name": "Logs" }
+    ],
+    "components": [
+      "NavSidebar",
+      "TopBar",
+      "Card",
+      "FormSTKBuilder",
+      "ToolPicker",
+      "PersonaEditor",
+      "RAGManager",
+      "WhatsAppConnect",
+      "ChatWindow",
+      "LogsViewer",
+      "FeatureFlagSwitch",
+      "TipsGuide"
+    ],
+    "ux_flows": {
+      "create_stk_agent": [
+        "abrir FormSTKBuilder",
+        "definir persona",
+        "selecionar tools",
+        "configurar RAG",
+        "gerar (aciona OCM pipeline.stk.build)",
+        "baixar sdk.zip"
+      ],
+      "connect_whatsapp": ["abrir WhatsAppConnect", "criar instância", "mostrar QR", "validar status", "mensagem de teste"],
+      "index_knowledge": ["upload fonte", "chunking", "embedding", "enviar para vector", "testar retrieval"]
+    },
+    "api_clients": { "base_url": "/api", "retry": { "retries": 2, "backoff_ms": 300 } },
+    "style": "iOS-like dark/gray; tipografia suave; animações discretas"
+  },
+  "prompts_library": {
+    "system": {
+      "generic_stk_agent": "Você é um agente STK {role} com tom {tone}. Objetivo: {goals}. Respeite {constraints}. Use ferramentas com parcimônia; não exponha dados sensíveis.",
+      "retrieval_policy": "Quando necessário, ative RAG: combine contexto e precisão; detalhe fonte quando aplicável."
+    },
+    "templates": {
+      "qualify_lead": "Faça 3 perguntas-chave para qualificar {lead_name}: orçamento, prazo e objetivo. Seja direto e cordial.",
+      "generate_post": "Crie 3 ideias de post sobre {tema} com CTA sutil. Formato: headline + bullets. Limites: {constraints}."
+    }
+  },
+  "dicas_section": {
+    "purpose": "Onboarding guiado para o gerador STK",
+    "topics": [
+      { "id": "t1", "title": "Criar seu primeiro agente STK", "goto": "/stk/novo" },
+      { "id": "t2", "title": "Conectar WhatsApp via Evolution", "goto": "/config?tab=whatsapp" },
+      { "id": "t3", "title": "Adicionar conhecimento (RAG)", "goto": "/stk?tab=knowledge" }
+    ]
+  },
+  "ci_cd": {
+    "provider": "GitHub Actions",
+    "workflows": [
+      { "name": "ci", "on": ["push"], "steps": ["lint", "tests", "build"] },
+      { "name": "preview", "on": ["pull_request"], "steps": ["spin_temporary_env"] },
+      { "name": "deploy-prod", "on": ["tag:v*"], "steps": ["migrations", "deploy_backend", "deploy_frontend"] }
+    ],
+    "matrix": { "python": ["3.11"], "db_engine": ["sqlite", "postgres"] },
+    "gates": { "quality": ["coverage>=80%"], "security": ["pip_audit", "npm_audit"] }
+  },
+  "testing": {
+    "levels": ["unit", "integration", "e2e", "load"],
+    "targets": {
+      "backend": ["APIs STK", "flows OCM", "tools", "RAG"],
+      "frontend": ["forms", "routing", "api_clients", "chat_ui"]
+    },
+    "minimum_coverage": 0.8,
+    "smoke_suite": ["health", "auth", "stk_generate", "chat_basic", "evolution_connect"],
+    "ci_matrix": { "python": ["3.11"], "db_engine": ["sqlite", "postgres"] }
+  },
+  "security": {
+    "jwt": { "alg": "HS256", "expiry_minutes": 60, "refresh_days": 14 },
+    "passwords": { "argon2": true, "min_length": 10 },
+    "headers": { "hsts": true, "content_security_policy": "default-src 'self'" },
+    "secrets": { "provider": "env", "rotation_policy_days": 90 },
+    "audit": { "events": ["login", "stk.generate", "stk.run", "integration.connect"], "retention_days": 365 }
+  },
+  "analytics": {
+    "events": [
+      "stk_generated",
+      "stk_versioned",
+      "chat_message_sent",
+      "rag_index_built",
+      "evolution_connected",
+      "whatsapp_message_sent",
+      "ocm_pipeline_completed"
+    ],
+    "kpis": [
+      "time_to_first_stk_agent",
+      "messages_per_session",
+      "retrieval_precision@k",
+      "sqlite_write_latency_ms_p95",
+      "sqlite_wal_growth_mb",
+      "vss_recall@k"
+    ]
+  },
+  "feature_flags": [
+    { "key": "use_sqlite_vector", "enabled": true, "scope": ["local", "edge"] },
+    { "key": "use_pgvector", "enabled": false, "scope": ["staging", "prod"] },
+    { "key": "enable_templates_gallery", "enabled": true }
+  ],
+  "ops": {
+    "runbooks": [
+      { "name": "OCM pipeline falhou", "steps": ["ver logs do estágio", "replay stage", "validar manifest.ocm.yaml", "checar secrets"] },
+      { "name": "QR do Evolution não aparece", "steps": ["checar webhook", "checar ENV", "forçar sync", "regenerar QR"] },
+      { "name": "RAG lento", "steps": ["ver métricas", "ajustar top_k", "reindexar", "alternar vector (flag)"] },
+      {
+        "name": "SQLite -> Postgres (migração)",
+        "steps": [
+          "Alembic: gerar/rodar migrações em Postgres",
+          "SQLite dump seletivo (core/knowledge), respeitar FK",
+          "Import psql + ANALYZE + REINDEX",
+          "Reconstruir vetores (pgvector/Qdrant)",
+          "Canary release e verificação de integridade"
+        ]
+      }
+    ],
+    "slo": { "availability": "99.5%", "latency_p95_ms": 400, "chat_msg_error_rate": "<=1%" },
+    "backups": { "postgres": "diário", "redis": "RDB/AOF", "retention_days": 7 }
+  },
+  "roadmap": {
+    "mvp": [
+      "Gerar agente STK via OCM (sdk.zip + manifest)",
+      "Chat de teste (loopback) com memória curta",
+      "RAG básico (upload+indexação)",
+      "Conexão Evolution (QR + envio)",
+      "Logs e métricas básicas"
+    ],
+    "v1_plus": [
+      "Versionamento de STK (registry interno)",
+      "Gallery de templates (somente STK)",
+      "Export OCM para múltiplos targets (serverless, docker)",
+      "CLI LUT-STK (wrap para pipelines OCM)"
+    ]
+  }
+}

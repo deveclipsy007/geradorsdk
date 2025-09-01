@@ -139,7 +139,7 @@ ASAAS_API_KEY=your-asaas-key
 
 # === CONFIGURAÇÕES DO SISTEMA ===
 HOST=0.0.0.0
-PORT=8000
+PORT=8001
 DEBUG=false
 DATABASE_URL=sqlite:///./agents.db
 ```
@@ -160,18 +160,16 @@ cd backend
 python main.py
 
 # Método 3: Uvicorn (produção)
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ### 🌐 Endpoints Disponíveis
 
 | Serviço | URL | Descrição |
 |---------|-----|------------|
-| **🎨 Interface Principal** | http://localhost:8000/static/index.html | SPA moderna e responsiva |
-| **📚 Documentação API** | http://localhost:8000/docs | Swagger/OpenAPI interativo |
-| **❤️ Health Check** | http://localhost:8000/health | Monitor de saúde do sistema |
-| **📊 Estatísticas** | http://localhost:8000/api/system/stats | Métricas em tempo real |
-| **⚙️ Configurações** | http://localhost:8000/api/config | Configurações ativas |
+| **🎨 Interface Principal** | http://localhost:8005 | SPA moderna e responsiva |
+| **📚 Documentação API** | http://localhost:8001/docs | Swagger/OpenAPI interativo |
+| **❤️ Health Check** | http://localhost:8001/api/health | Monitor de saúde do sistema |
 
 ## 📖 Guia de Uso
 
@@ -191,13 +189,13 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 #### **Via API**
 
 ```bash
-curl -X POST "http://localhost:8000/api/agents/sdk/create" \
+curl -X POST "http://localhost:8001/api/agents" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Assistente de Vendas",
     "specialization": "sales",
     "description": "Agente para automatizar vendas via WhatsApp",
-    "model": "claude-3-sonnet-20240229",
+    "model": "claude-3-5-sonnet-20241022",
     "instructions": "Você é um vendedor especializado...",
     "whatsapp_config": {
       "instance_name": "vendas01"

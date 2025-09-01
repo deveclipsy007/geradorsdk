@@ -127,22 +127,19 @@
                                     </label>
                                 </div>
                                 <div class="integration-config" id="whatsapp-config" style="display: none;">
-                                    <div class="config-grid">
-                                        <div class="config-field">
-                                            <label>Evolution API URL</label>
-                                            <input type="url" id="evolution-api-url" placeholder="http://localhost:8080" value="http://localhost:8080">
+                                    <div class="whatsapp-connection-panel">
+                                        <div class="connection-info">
+                                            <h5><i class="fab fa-whatsapp"></i> Conexão WhatsApp</h5>
+                                            <p>O agente será conectado automaticamente ao WhatsApp usando Evolution API</p>
                                         </div>
-                                        <div class="config-field">
-                                            <label>API Key (opcional)</label>
-                                            <input type="password" id="evolution-api-key" placeholder="Chave da API Evolution">
+                                        <div class="instance-info">
+                                            <label>Nome da Instância:</label>
+                                            <input type="text" id="whatsapp-instance-name" readonly>
+                                            <small>A instância terá o mesmo nome do agente</small>
                                         </div>
-                                        <div class="config-field">
-                                            <label>Nome da Instância</label>
-                                            <input type="text" id="evolution-instance-name" placeholder="sdk-agent-instance">
-                                        </div>
-                                        <div class="config-field">
-                                            <label>Webhook URL</label>
-                                            <input type="url" id="evolution-webhook" placeholder="https://seusite.com/webhook">
+                                        <div class="connection-status" id="whatsapp-connection-status">
+                                            <span class="status-indicator" id="whatsapp-status-indicator"></span>
+                                            <span class="status-text" id="whatsapp-status-text">Não conectado</span>
                                         </div>
                                     </div>
                                     <div class="qr-code-section" id="whatsapp-qr-section" style="display: none;">
@@ -154,14 +151,20 @@
                                         <p class="qr-instructions">Abra o WhatsApp no seu celular e escaneie o código QR</p>
                                     </div>
                                     <div class="integration-actions">
-                                        <button type="button" class="btn-secondary" id="generate-qr-btn" data-integration="whatsapp">
-                                            <i class="fas fa-qrcode"></i> Gerar QR Code
+                                        <button type="button" class="btn-primary" id="connect-whatsapp-btn">
+                                            <i class="fas fa-plug"></i> Conectar WhatsApp
                                         </button>
-                                        <button type="button" class="btn-secondary test-integration" data-integration="whatsapp">
-                                            <i class="fas fa-flask"></i> Testar Conexão
+                                        <button type="button" class="btn-secondary" id="refresh-whatsapp-btn">
+                                            <i class="fas fa-sync-alt"></i> Atualizar
                                         </button>
-                                        <button type="button" class="btn-primary save-integration" data-integration="whatsapp">
-                                            <i class="fas fa-save"></i> Salvar Configuração
+                                        <button type="button" class="btn-success" id="proceed-whatsapp-btn" style="display: none;">
+                                            <i class="fas fa-arrow-right"></i> Prosseguir
+                                        </button>
+                                        <button type="button" class="btn-secondary" id="disconnect-whatsapp-btn" style="display: none;">
+                                            <i class="fas fa-unlink"></i> Desconectar
+                                        </button>
+                                        <button type="button" class="btn-secondary" id="test-whatsapp-btn" style="display: none;">
+                                            <i class="fas fa-paper-plane"></i> Enviar Teste
                                         </button>
                                     </div>
                                 </div>
